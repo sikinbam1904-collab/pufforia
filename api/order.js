@@ -17,7 +17,7 @@ function getDb() {
   return admin.firestore();
 }
 
-const ADMIN_UID = 'HX4WDnF8UdhwWiHgBWmb1f7PIRw2';
+const ADMIN_UID = 'GqZRVXiadraaamU7mLaXamwOPBf2
 const db = () => getDb();
 const FieldValue = admin.firestore.FieldValue;
 
