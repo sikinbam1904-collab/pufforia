@@ -28,7 +28,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script>window.__firebaseSdkReady = Promise.resolve();</script>
 
     <style>
         .theme-color-row { display: grid; grid-template-columns: minmax(0,1fr) 50px; gap: 8px; align-items: end; }
@@ -1889,6 +1888,27 @@
         let auth = null;
         let firebaseReady = false;
 
+        // Initialize the DEFAULT Firebase app immediately after the SDK scripts
+        // have loaded. This prevents the startup race that can produce:
+        // "The default Firebase app does not exist."
+        try {
+            if (typeof firebase !== 'undefined' && typeof firebase.initializeApp === 'function') {
+                let app;
+                try {
+                    app = firebase.app();
+                } catch (_) {
+                    app = firebase.initializeApp(firebaseConfig);
+                }
+                db = app.firestore();
+                auth = app.auth();
+                firebaseReady = true;
+            } else {
+                console.error('[Firebase] Compat SDK has not loaded.');
+            }
+        } catch (error) {
+            console.error('[Firebase] Immediate initialization failed:', error);
+        }
+
         // Firebase bootstrap — the important part is checking for the
         // *DEFAULT* app specifically. firebase.apps.length can be true even
         // when only a named app exists, and firebase.app() would then throw:
@@ -1901,25 +1921,20 @@
                 return false;
             }
 
-            if (typeof window.firebase === 'undefined' ||
-                typeof window.firebase.initializeApp !== 'function' ||
-                typeof window.firebase.firestore !== 'function' ||
-                typeof window.firebase.auth !== 'function') {
-                console.error('[Firebase] Firebase Compat SDK has not loaded yet.');
+            if (typeof firebase === 'undefined' || typeof firebase.initializeApp !== 'function') {
+                console.error('[Firebase] Firebase Compat SDK has not loaded.');
                 return false;
             }
 
             try {
-                // Explicitly create/obtain the DEFAULT Firebase app first.
+                // Always obtain/create the DEFAULT app first. Using the app instance
+                // for Firestore/Auth avoids the "default Firebase app does not exist"
+                // race that can happen when another script touches a service early.
                 let app;
-                if (window.firebase.apps && window.firebase.apps.length > 0) {
-                    try {
-                        app = window.firebase.app();
-                    } catch (_) {
-                        app = window.firebase.initializeApp(firebaseConfig);
-                    }
-                } else {
-                    app = window.firebase.initializeApp(firebaseConfig);
+                try {
+                    app = firebase.app();
+                } catch (_) {
+                    app = firebase.initializeApp(firebaseConfig);
                 }
 
                 db = app.firestore();
@@ -4896,18 +4911,18 @@
             try {
                 const image=await compressToBase64Image(file,{maxDimension:1600,quality:0.82,maxDataUrlBytes:500*1024});
                 const response=await fetch('/api/order',{
-                    method:'POST',
-                    headers:{'Content-Type':'application/json'},
+                    method:'POST',headers:{'Content-Type':'application/json'},
                     body:JSON.stringify({action:'submit-slip',token,image})
                 });
                 const result=await response.json().catch(()=>({}));
-                if(!response.ok || !result.ok) throw new Error(result.error||'ส่งสลิปไม่สำเร็จค่ะ');
-                showToast('ส่งสลิปให้แอดมินตรวจแล้วค่ะ');
+                if(!response.ok || !result.ok) throw new Error(result.error||'ตรวจสลิปไม่สำเร็จค่ะ');
+                if(result.verified) showToast('ตรวจสลิปสำเร็จค่ะ ยืนยันการชำระเงินแล้ว');
+                else showToast(result.message||'ส่งสลิปแล้วค่ะ ระบบจะตรวจสอบให้โดยอัตโนมัติ');
                 input.value='';
                 await lookupGuestOrder();
             } catch(error) {
-                console.error('Slip upload failed',error);
-                showToast(error.message||'ส่งสลิปไม่สำเร็จค่ะ กรุณาลองใหม่อีกครั้ง');
+                console.error('Automatic slip verification failed',error);
+                showToast(error.message||'ตรวจสลิปไม่สำเร็จค่ะ กรุณาลองใหม่อีกครั้ง');
             } finally {button.disabled=false;}
         }
         function readSmallFile(file,maxBytes=300*1024) {
@@ -5153,9 +5168,6 @@
             updateClock();
             try {
                 updateDataLoadingText('กำลังเตรียมหน้าร้าน...');
-
-                await window.__firebaseSdkReady;
-                await new Promise(resolve => setTimeout(resolve, 0));
 
                 const firebaseOk = initializeFirebaseSafely();
                 if (!firebaseOk) {
