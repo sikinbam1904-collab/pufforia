@@ -24,6 +24,7 @@
     
     <!-- Firebase Compat Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -1606,6 +1607,26 @@
         const STORAGE_CONFIG = 'shop_template_config_v1';
         const ADMIN_EMAIL = 'feurdelystore@gmail.com'; // Firebase Authentication > Users: admin email
         const ADMIN_UID = 'GqZRVXiadraaamU7mLaXamwOPBf2'; // Firebase Authentication > Users: admin UID
+
+        async function adminOrderApi(action, payload = {}) {
+            if (!auth?.currentUser || auth.currentUser.uid !== ADMIN_UID) {
+                throw new Error('กรุณาเข้าสู่ระบบแอดมินก่อนค่ะ');
+            }
+            const idToken = await auth.currentUser.getIdToken();
+            const response = await fetch('/api/order', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + idToken
+                },
+                body: JSON.stringify({ action, ...payload })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || 'ดำเนินการออร์เดอร์ไม่สำเร็จค่ะ');
+            }
+            return data;
+        }
         const DEFAULT_COVER_IMAGE = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="450"><rect width="1200" height="450" fill="#FFE1F0"/><circle cx="1050" cy="80" r="240" fill="#E8F6FF"/><text x="600" y="245" text-anchor="middle" fill="#D870B8" font-size="58" font-family="sans-serif">YOUR SHOP</text></svg>');
         const PREVIOUS_DEFAULT_COVER_IMAGE = '';
 
@@ -1855,28 +1876,34 @@
         // For Firebase JS SDK v7.20.0 and later, measurementId is optional
         const firebaseConfig = {
             apiKey: "AIzaSyDPNU5jV_X_Y3L_QNoC-RnoHLR6-_PGatQ",
-            authDomain: "pufforia-977d1.firebaseapp.com",
-            projectId: "pufforia-977d1",
-            storageBucket: "pufforia-977d1.firebasestorage.app",
-            messagingSenderId: "544134986486",
-            appId: "1:544134986486:web:b0b3175d5b19766f844ad7",
-            measurementId: "G-D225Y1GSV6"
+  authDomain: "pufforia-977d1.firebaseapp.com",
+  projectId: "pufforia-977d1",
+  storageBucket: "pufforia-977d1.firebasestorage.app",
+  messagingSenderId: "544134986486",
+  appId: "1:544134986486:web:b0b3175d5b19766f844ad7",
+  measurementId: "G-D225Y1GSV6"
         };
 
         let db = null;
         let auth = null;
         let firebaseReady = false;
 
+        // Initialize Firebase only after all Compat libraries are loaded.
+        // This also safely reuses an existing default app instead of calling
+        // Firebase services before a default app exists.
         function initializeFirebaseSafely() {
             if (firebaseReady && db && auth) return true;
             if (!firebaseConfig.apiKey || typeof firebase === 'undefined') return false;
+
             try {
                 const app = firebase.apps && firebase.apps.length
                     ? firebase.app()
                     : firebase.initializeApp(firebaseConfig);
+
                 db = firebase.firestore(app);
                 auth = firebase.auth(app);
                 firebaseReady = true;
+
                 auth.onAuthStateChanged((user) => {
                     isAdminLoggedIn = !!user && user.uid === ADMIN_UID;
                     updateAdminLockIcon();
@@ -1887,6 +1914,7 @@
                     if (isAdminLoggedIn) { listenAdminOrders(); syncLegacyCodeStockCounts(); }
                     else { if (unsubscribeAdminOrders) unsubscribeAdminOrders(); unsubscribeAdminOrders=null; adminOrders=[]; renderAdminOrders(); }
                 });
+
                 return true;
             } catch (error) {
                 firebaseReady = false;
@@ -3172,7 +3200,7 @@
         // Cloudinary: image files are uploaded here; Firestore stores only the returned URL.
         // Do NOT put an API secret in this HTML. Unsigned uploads use only the cloud name + preset.
         const CLOUDINARY_CLOUD_NAME = 'xhqo2hab';
-        const CLOUDINARY_UPLOAD_PRESET = 'Lemon_upload';
+        const CLOUDINARY_UPLOAD_PRESET = 'pufforia';
         const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
 
         async function uploadImageToCloudinary(fileOrDataUrl, folder='ancha') {
@@ -4613,25 +4641,28 @@
         }
         async function createGuestOrder(event) {
             event.preventDefault();
-            if(!db) return showToast('ระบบออร์เดอร์ยังไม่พร้อมค่ะ');
             const lines=cartLines(), totalCents=cartTotalCents(lines);
             if(!lines.length || totalCents<=0 || totalCents>999999900) return showToast('กรุณาตรวจสอบยอดสินค้า');
             const stockError = cartAvailabilityMessage(lines);
             if (stockError) return showToast(stockError);
             const button=document.getElementById('createOrderButton'); button.disabled=true;
             try {
-                const latest = await Promise.all(lines.map(line => db.collection('products_cakee').doc(line.product.id).get()));
-                const currentLines = lines.map((line, index) => ({product: latest[index].data(), qty: line.qty}));
-                if (currentLines.some((line,index) => !line.product || Number(line.product.priceBaht) !== Number(lines[index].product.priceBaht)))
-                    throw new Error('ข้อมูลสินค้ามีการเปลี่ยนแปลง กรุณาเปิดตะกร้าใหม่ค่ะ');
-                const latestStockError = cartAvailabilityMessage(currentLines);
-                if (latestStockError) throw new Error(latestStockError);
-                const token=orderToken(), orderNo='AM-'+token.slice(0,8).toUpperCase();
-                const order={orderNo, name:document.getElementById('checkoutName').value.trim(), contact:document.getElementById('checkoutContact').value.trim(),
-                    email:document.getElementById('checkoutEmail').value.trim(), note:document.getElementById('checkoutNote').value.trim(),
-                    items:lines.map(({product,qty})=>({productId:product.id,title:String(product.title||'สินค้า').slice(0,120),qty,priceCents:Math.round(Number(product.priceBaht)*100),deliveryType:product.deliveryType||'custom'})),
-                    totalCents, status:'awaiting_slip', createdAt:firebase.firestore.FieldValue.serverTimestamp()};
-                await db.collection('orders_cakee').doc(token).set(order);
+                const payload={
+                    action:'create',
+                    name:document.getElementById('checkoutName').value.trim(),
+                    contact:document.getElementById('checkoutContact').value.trim(),
+                    email:document.getElementById('checkoutEmail').value.trim(),
+                    note:document.getElementById('checkoutNote').value.trim(),
+                    items:lines.map(({product,qty})=>({productId:product.id,qty}))
+                };
+                const response=await fetch('/api/order',{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify(payload)
+                });
+                const result=await response.json().catch(()=>({}));
+                if(!response.ok || !result.ok) throw new Error(result.error||'สร้างออร์เดอร์ไม่สำเร็จค่ะ');
+                const token=result.token, orderNo=result.orderNo;
                 localStorage.setItem(LAST_ORDER_KEY,token);
                 guestCart=[];saveCart();closeCheckout();
                 document.getElementById('lookupOrderNo').value=orderNo;
@@ -4658,23 +4689,34 @@
         }
         async function lookupGuestOrder() {
             const token=lookupToken(), result=document.getElementById('lookupResult');result.replaceChildren();
-            if(!token || !db) {result.textContent='กรุณากรอกเลขออร์เดอร์และรหัสรับสินค้าให้ครบค่ะ';return;}
+            if(!token) {result.textContent='กรุณากรอกเลขออร์เดอร์และรหัสรับสินค้าให้ครบค่ะ';return;}
             result.textContent='กำลังโหลดออร์เดอร์...';
             try {
-                const snap=await db.collection('orders_cakee').doc(token).get();
-                if(!snap.exists || snap.data().orderNo!=='AM-'+token.slice(0,8).toUpperCase()) {result.textContent='ไม่พบออร์เดอร์ค่ะ';return;}
+                const response=await fetch('/api/order',{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({action:'lookup',token})
+                });
+                const data=await response.json().catch(()=>({}));
+                if(!response.ok || !data.ok) {result.textContent=data.error||'ไม่พบออร์เดอร์ค่ะ';return;}
                 localStorage.setItem(LAST_ORDER_KEY,token);
-                await renderGuestOrder(token,snap.data());
+                await renderGuestOrder(token,data.order);
                 if(unsubscribeGuestOrder)unsubscribeGuestOrder();
-                unsubscribeGuestOrder=db.collection('orders_cakee').doc(token).onSnapshot(changed=>{
+                const refresh=async()=>{
                     if(!document.getElementById('orderLookupModal').classList.contains('active'))return;
-                    if(changed.exists)renderGuestOrder(token,changed.data());
-                    else {
-                        result.textContent='ออร์เดอร์นี้ถูกลบแล้วค่ะ';
-                        if(localStorage.getItem(LAST_ORDER_KEY)===token)localStorage.removeItem(LAST_ORDER_KEY);
-                    }
-                },error=>console.error('Order status listener failed',error));
-            } catch(error) {console.error(error);result.textContent='เปิดออร์เดอร์ไม่สำเร็จ กรุณาตรวจรหัสหรือกฎฐานข้อมูลค่ะ';}
+                    try{
+                        const res=await fetch('/api/order',{
+                            method:'POST',
+                            headers:{'Content-Type':'application/json'},
+                            body:JSON.stringify({action:'lookup',token})
+                        });
+                        const latest=await res.json().catch(()=>({}));
+                        if(res.ok && latest.ok) await renderGuestOrder(token,latest.order);
+                    }catch(error){console.error('Order refresh failed',error);}
+                };
+                const interval=setInterval(refresh,8000);
+                unsubscribeGuestOrder=()=>clearInterval(interval);
+            } catch(error) {console.error(error);result.textContent='เปิดออร์เดอร์ไม่สำเร็จ กรุณาตรวจรหัสหรือระบบเซิร์ฟเวอร์ค่ะ';}
         }
         async function renderGuestOrder(token,order) {
             const box=document.getElementById('lookupResult');box.replaceChildren();
@@ -4684,6 +4726,14 @@
             const summary=document.createElement('p');summary.className='font-bold';summary.textContent=`${order.orderNo} • ${status[order.status]||order.status} • ${money(order.totalCents)}`;
             const secret=document.createElement('p');secret.className='break-all bg-white p-2 rounded-lg';secret.textContent='รหัสรับสินค้า: '+token.slice(8).toUpperCase()+' • โปรดบันทึกไว้';
             statusCard.append(statusTitle,summary,secret);box.append(statusCard);
+            if(order.status==='paid') {
+                const qrCard=document.createElement('section');qrCard.className='bg-white border border-[#F8C8DC] rounded-xl p-3 text-center space-y-2';
+                const qrTitle=document.createElement('strong');qrTitle.className='block text-[#D870B8]';qrTitle.textContent='♡ QR สำหรับรับสินค้า';
+                const qrHint=document.createElement('p');qrHint.className='text-sm';qrHint.textContent='แสดง QR นี้ให้ร้านสแกนเมื่อมารับสินค้าค่ะ';
+                const qr=document.createElement('div');qr.className='inline-block';
+                if(typeof QRCode==='function') new QRCode(qr,{text:`cakee-receive:v1:${order.orderNo}:${token.slice(8).toUpperCase()}`,width:220,height:220,correctLevel:QRCode.CorrectLevel.M});
+                qrCard.append(qrTitle,qrHint,qr);box.append(qrCard);
+            }
 
             const detailCard=document.createElement('section');detailCard.className='bg-white border border-[#F8C8DC] rounded-xl p-3 space-y-2';
             const detailTitle=document.createElement('h4');detailTitle.className='font-bold text-[#D870B8]';detailTitle.textContent='รายละเอียดสินค้า';detailCard.append(detailTitle);
@@ -4727,10 +4777,9 @@
                     const label=document.createElement('strong');label.textContent=item.title+' × '+item.qty;row.append(label);
                     let hasDelivery=false;
                     try {
-                        const delivery=await db.collection('orders_cakee').doc(token).collection('deliveries').doc(item.productId).get();
-                        if(delivery.exists) {
+                        const data=(order.deliveries||[]).find(delivery=>delivery.id===item.productId);
+                        if(data) {
                             hasDelivery=true;
-                            const data=delivery.data();
                             if(data.codes?.length) {
                                 const codes=data.codes.map(String);
                                 const p=document.createElement('p');p.className='break-all whitespace-pre-line mt-2';
@@ -4792,104 +4841,21 @@
             const file=input.files?.[0];if(!file) return showToast('กรุณาเลือกภาพสลิปค่ะ');
             button.disabled=true;
             try {
-                // Payment slips are stored directly in Firestore as compressed Base64.
-                // Keep the image below ~500 KB so the slip document remains well below
-                // Firestore's 1 MiB document limit after adding metadata.
-                const image=await compressToBase64Image(file,{
-                    maxDimension:1600,
-                    quality:0.82,
-                    maxDataUrlBytes:500*1024
+                const image=await compressToBase64Image(file,{maxDimension:1600,quality:0.82,maxDataUrlBytes:500*1024});
+                const accessCode=token.slice(8).toUpperCase();
+                const response=await fetch('/api/verify-slip',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({token,accessCode,base64:image})
                 });
-                // Keep the slip and its order status in one atomic write. A denied
-                // status update must not leave a slip behind with an old status.
-                const orderRef=db.collection('orders_cakee').doc(token);
-                const slipRef=db.collection('order_slips_cakee').doc(token);
-                const batch=db.batch();
-                batch.set(slipRef,{image,imageHost:'base64',submittedAt:firebase.firestore.FieldValue.serverTimestamp()});
-                batch.update(orderRef,{status:'submitted'});
-                await batch.commit();
-                showToast('ส่งสลิปแล้วค่ะ รอแอดมินตรวจสอบ');await lookupGuestOrder();
+                const result=await response.json().catch(()=>({}));
+                if(!response.ok || !result.success) throw new Error(result.message||'ตรวจสลิปไม่สำเร็จค่ะ');
+                showToast('ตรวจสลิปสำเร็จค่ะ ยืนยันการชำระเงินแล้ว');
+                input.value='';
+                await lookupGuestOrder();
             } catch(error) {
-                console.error('Slip submission failed',error);
-                showToast(error.code==='permission-denied'
-                    ? 'ระบบยังไม่อนุญาตให้ส่งสลิป กรุณาติดต่อร้านค่ะ'
-                    : (error.message||'ส่งสลิปไม่สำเร็จค่ะ'));
-            }
-            finally {button.disabled=false;}
-        }
-
-        function updateDeliveryFields() {
-            const type=document.getElementById('productDeliveryType').value;
-            document.getElementById('productDeliveryFileField').classList.toggle('hidden',type!=='file');
-            document.getElementById('productDeliveryCodeField').classList.toggle('hidden',type!=='code');
-        }
-        function productCodeFieldValues() {
-            return [...document.querySelectorAll('#productCodeFields textarea')].map(field => field.value);
-        }
-        function updateProductCodeCount() {
-            const count = productCodeFieldValues().filter(value => value.trim()).length;
-            document.getElementById('productCodeStockInfo').textContent =
-                `สต็อกพร้อมขายเดิม ${productCodeOriginal.length} ชิ้น • หลังบันทึก ${count} ชิ้น`;
-        }
-        function renderProductCodeInputs(values = ['']) {
-            const container = document.getElementById('productCodeFields');
-            container.replaceChildren();
-            (values.length ? values : ['']).forEach((value, index) => {
-                const row = document.createElement('div');
-                row.className = 'rounded-xl border border-[#F8C8DC] bg-white p-2';
-                const header = document.createElement('div');
-                header.className = 'mb-1 flex items-center justify-between gap-2';
-                const label = document.createElement('label');
-                label.className = 'admin-label mb-0';
-                label.textContent = `สินค้าชิ้นที่ ${index + 1}`;
-                const field = document.createElement('textarea');
-                field.className = 'admin-input';
-                field.rows = 3;
-                field.maxLength = 500000;
-                field.placeholder = 'ใส่สินค้าหรือข้อความสินค้า 1 ชิ้น (ขึ้นบรรทัดใหม่ได้)';
-                field.value = value;
-                field.id = `productCodeField-${index}`;
-                field.addEventListener('input', updateProductCodeCount);
-                label.htmlFor = field.id;
-                const remove = document.createElement('button');
-                remove.type = 'button';
-                remove.className = 'rounded-lg px-2 py-1 text-xs font-bold text-rose-600';
-                remove.textContent = 'ลบช่องนี้';
-                remove.setAttribute('aria-label', `ลบช่องสินค้า/โค้ดชิ้นที่ ${index + 1}`);
-                remove.onclick = () => removeProductCodeField(index);
-                header.append(label, remove);
-                row.append(header, field);
-                container.append(row);
-            });
-            updateProductCodeCount();
-        }
-        function addProductCodeField() {
-            renderProductCodeInputs([...productCodeFieldValues(), '']);
-            document.getElementById('productCodeFields').lastElementChild?.querySelector('textarea')?.focus();
-        }
-        function removeProductCodeField(index) {
-            const values = productCodeFieldValues();
-            values.splice(index, 1);
-            renderProductCodeInputs(values);
-        }
-        async function loadProductDeliveryInfo(id, version) {
-            const info=document.getElementById('productDeliveryFileInfo'); info.textContent=id?'กำลังโหลดข้อมูลส่งมอบ...':'ไฟล์จะถูกเก็บแยกจากหน้าสินค้าสาธารณะ';
-            document.getElementById('productCodeStockInfo').textContent = id ? 'กำลังโหลดสต็อกสินค้า...' : 'สต็อกพร้อมขายเดิม 0 ชิ้น • หลังบันทึก 0 ชิ้น';
-            if(!id||!db) { productCodeInventoryReady = true; return; }
-            try {
-                const snap=await db.collection('product_delivery_cakee').doc(id).get();
-                if(version !== productCodeLoadVersion || document.getElementById('productEditId').value!==id)return;
-                const data=snap.data()||{};
-                info.textContent=data.fileName?'ไฟล์ปัจจุบัน: '+data.fileName:'ยังไม่มีไฟล์สินค้า';
-                productCodeOriginal = Array.isArray(data.codes) ? data.codes.map(String) : [];
-                productCodeInventoryReady = true;
-                renderProductCodeInputs(productCodeOriginal);
-            } catch(error) {
-                if(version !== productCodeLoadVersion)return;
-                info.textContent='โหลดข้อมูลส่งมอบไม่สำเร็จ';
-                document.getElementById('productCodeStockInfo').textContent='โหลดสต็อกสินค้าไม่สำเร็จ กรุณาลองเปิดสินค้าใหม่';
-                console.error(error);
-            }
+                console.error('Automatic slip verification failed',error);
+                showToast(error.message||'ตรวจสลิปไม่สำเร็จค่ะ กรุณาลองใหม่อีกครั้ง');
+            } finally {button.disabled=false;}
         }
         function readSmallFile(file,maxBytes=300*1024) {
             return new Promise((resolve,reject)=>{
@@ -4934,11 +4900,22 @@
                 });
             }
         }
+        async function refreshAdminOrders() {
+            if(auth?.currentUser?.uid!==ADMIN_UID)return;
+            try {
+                const data=await adminOrderApi('admin-list');
+                adminOrders=Array.isArray(data.orders)?data.orders:[];
+                renderAdminOrders();
+            } catch(error) {
+                console.error('Orders load failed',error);
+                showToast(error.message||'โหลดออร์เดอร์ไม่สำเร็จค่ะ');
+            }
+        }
         function listenAdminOrders() {
-            if(!db||unsubscribeAdminOrders||auth?.currentUser?.uid!==ADMIN_UID)return;
-            unsubscribeAdminOrders=db.collection('orders_cakee').orderBy('createdAt','desc').limit(300).onSnapshot(snapshot=>{
-                adminOrders=snapshot.docs.map(doc=>({id:doc.id,...doc.data()}));renderAdminOrders();
-            },error=>{console.error('Orders listener failed',error);showToast('โหลดออร์เดอร์ไม่สำเร็จ ตรวจสอบกฎฐานข้อมูลค่ะ');});
+            if(unsubscribeAdminOrders||auth?.currentUser?.uid!==ADMIN_UID)return;
+            refreshAdminOrders();
+            const interval=setInterval(refreshAdminOrders,8000);
+            unsubscribeAdminOrders=()=>clearInterval(interval);
         }
         function isCompletedOrder(order) {
             return order.status==='paid' && (Boolean(order.completedAt) || !(order.items||[]).some(item=>item.deliveryType==='custom'));
@@ -4971,6 +4948,9 @@
                 detail.textContent=`${order.name||''} | ${order.contact||''} | ${order.email||''}\n${(order.items||[]).map(item=>`${item.title} × ${item.qty} (${money(item.priceCents*item.qty)})`).join('\n')}\nโน้ต: ${order.note||'-'}`;
                 const slip=document.createElement('button');slip.className='text-[#397CA5] underline';slip.textContent='ดูสลิป';slip.onclick=()=>showAdminSlip(order.id,card);
                 card.append(title,detail,slip);
+                if(order.status==='paid') {
+                    const scan=document.createElement('button');scan.type='button';scan.className='w-full bg-[#397CA5] text-white p-2 rounded-lg font-bold';scan.textContent='▣ สแกน QR รับสินค้า';scan.onclick=()=>openReceiveScanner();card.append(scan);
+                }
                 if(order.status==='submitted') {
                     const controls=document.createElement('div');controls.className='flex gap-2';
                     const confirm=document.createElement('button');confirm.className='bg-[#D870B8] text-white p-2 rounded-lg flex-1 font-bold';confirm.textContent='ยืนยันเงินและส่งสินค้า';confirm.onclick=()=>approveGuestOrder(order.id,confirm);
@@ -5008,12 +4988,9 @@
             if(!confirm(`ยกเลิกออร์เดอร์นี้ใช่ไหมคะ?\n${warning}`))return;
             button.disabled=true;
             try {
-                await db.runTransaction(async tx=>{
-                    const ref=db.collection('orders_cakee').doc(id), snap=await tx.get(ref);
-                    if(!snap.exists||snap.data().status==='cancelled')throw new Error('ออร์เดอร์นี้ถูกลบหรือยกเลิกแล้ว');
-                    tx.update(ref,{status:'cancelled',cancelledAt:firebase.firestore.FieldValue.serverTimestamp()});
-                });
+                await adminOrderApi('admin-cancel',{id});
                 showToast('ยกเลิกออร์เดอร์แล้วค่ะ');
+                await refreshAdminOrders();
             } catch(error) {console.error(error);showToast(error.message||'ยกเลิกออร์เดอร์ไม่สำเร็จค่ะ');}
             finally {button.disabled=false;}
         }
@@ -5022,77 +4999,48 @@
             if(!confirm(`ลบออร์เดอร์ ${orderNo} ถาวรใช่ไหมคะ? ลูกค้าจะเปิดออร์เดอร์นี้ไม่ได้อีก และสลิปกับข้อมูลส่งสินค้าจะถูกลบด้วย`))return;
             button.disabled=true;
             try {
-                const ref=db.collection('orders_cakee').doc(id);
-                const deliveries=await ref.collection('deliveries').get();
-                const batch=db.batch();
-                deliveries.docs.forEach(doc=>batch.delete(doc.ref));
-                batch.delete(db.collection('order_slips_cakee').doc(id));
-                batch.delete(ref);
-                await batch.commit();
+                await adminOrderApi('admin-delete',{id});
                 showToast('ลบออร์เดอร์แล้วค่ะ');
-            } catch(error) {console.error(error);showToast('ลบออร์เดอร์ไม่สำเร็จค่ะ');}
+                await refreshAdminOrders();
+            } catch(error) {console.error(error);showToast(error.message||'ลบออร์เดอร์ไม่สำเร็จค่ะ');}
             finally {button.disabled=false;}
         }
         async function setOrderCompleted(id,completed,button) {
             if(auth?.currentUser?.uid!==ADMIN_UID)return;
             button.disabled=true;
             try {
-                await db.collection('orders_cakee').doc(id).update({completedAt:completed?firebase.firestore.FieldValue.serverTimestamp():firebase.firestore.FieldValue.delete()});
+                await adminOrderApi('admin-complete',{id,completed});
                 showToast(completed?'ย้ายออร์เดอร์ไปสำเร็จแล้วค่ะ':'ย้ายกลับกำลังดำเนินการแล้วค่ะ');
-            } catch(error) {console.error(error);showToast('ย้ายออร์เดอร์ไม่สำเร็จค่ะ');}
+                await refreshAdminOrders();
+            } catch(error) {console.error(error);showToast(error.message||'ย้ายออร์เดอร์ไม่สำเร็จค่ะ');}
             finally {button.disabled=false;}
         }
         async function showAdminSlip(id,card) {
             if(auth?.currentUser?.uid!==ADMIN_UID)return;
             try {
-                const snap=await db.collection('order_slips_cakee').doc(id).get();
-                if(!snap.exists)return showToast('ลูกค้ายังไม่ได้ส่งสลิป');
+                const data=await adminOrderApi('admin-slip',{id});
+                if(!data.slip)return showToast('ลูกค้ายังไม่ได้ส่งสลิป');
                 card.querySelector('.admin-slip-preview')?.remove();
-                const img=document.createElement('img');img.className='admin-slip-preview max-h-72 max-w-full object-contain rounded-xl';img.alt='สลิปที่ลูกค้าแนบ';img.src=snap.data().image;card.append(img);
-            } catch(error) {console.error(error);showToast('เปิดสลิปไม่สำเร็จ');}
+                const img=document.createElement('img');img.className='admin-slip-preview max-h-72 max-w-full object-contain rounded-xl';img.alt='สลิปที่ลูกค้าแนบ';img.src=data.slip.image;card.append(img);
+            } catch(error) {console.error(error);showToast(error.message||'เปิดสลิปไม่สำเร็จ');}
         }
         async function approveGuestOrder(id,button) {
             if(auth?.currentUser?.uid!==ADMIN_UID||!confirm('ตรวจเงินเข้าบัญชีและยอดสินค้าแล้วใช่ไหมคะ? เมื่อกดยืนยัน ลูกค้าจะรับไฟล์หรือสินค้าได้ทันที'))return;
             button.disabled=true;
             try {
-                await db.runTransaction(async tx=>{
-                    const orderRef=db.collection('orders_cakee').doc(id), slipRef=db.collection('order_slips_cakee').doc(id);
-                    const orderSnap=await tx.get(orderRef), slipSnap=await tx.get(slipRef);
-                    if(!orderSnap.exists||orderSnap.data().status!=='submitted'||!slipSnap.exists)throw new Error('ออร์เดอร์หรือสลิปไม่พร้อม');
-                    const order=orderSnap.data(), items=order.items||[];
-                    if(!items.length||items.length>20||items.some(item=>!Number.isInteger(item.qty)||item.qty<1||item.qty>20||!Number.isInteger(item.priceCents)||item.priceCents<1)
-                        ||new Set(items.map(item=>item.productId)).size!==items.length
-                        ||items.reduce((sum,item)=>sum+item.qty*item.priceCents,0)!==order.totalCents)throw new Error('ยอดสินค้าไม่ตรง กรุณาตรวจออร์เดอร์');
-                    const productSnaps=[], stockSnaps=[];
-                    for(const item of items) {
-                        productSnaps.push(await tx.get(db.collection('products_cakee').doc(item.productId)));
-                        stockSnaps.push(item.deliveryType==='custom'?null:await tx.get(db.collection('product_delivery_cakee').doc(item.productId)));
-                    }
-                    items.forEach((item,index)=>{
-                        const product=productSnaps[index].data();
-                        if(!product||String(product.title||'สินค้า')!==item.title||Math.round(Number(product.priceBaht)*100)!==item.priceCents||product.deliveryType!==item.deliveryType)throw new Error('ราคาหรือประเภทสินค้ามีการแก้ไข กรุณาตรวจสอบก่อนยืนยัน');
-                        const stock=stockSnaps[index]?.data();
-                        if(item.deliveryType==='file') {
-                            if(!stock?.fileData)throw new Error('ยังไม่มีไฟล์สำหรับ '+item.title);
-                            tx.set(orderRef.collection('deliveries').doc(item.productId),{fileData:stock.fileData,fileName:stock.fileName||'สินค้า',deliveredAt:firebase.firestore.FieldValue.serverTimestamp()});
-                        }
-                        if(item.deliveryType==='code') {
-                            if(!stock||!Array.isArray(stock.codes)||stock.codes.length<item.qty)throw new Error('โค้ดของ '+item.title+' ไม่พอ');
-                            tx.set(orderRef.collection('deliveries').doc(item.productId),{codes:stock.codes.slice(0,item.qty),deliveredAt:firebase.firestore.FieldValue.serverTimestamp()});
-                            tx.update(stockSnaps[index].ref,{codes:stock.codes.slice(item.qty)});
-                            tx.update(productSnaps[index].ref,{stockCount:stock.codes.length-item.qty});
-                        }
-                    });
-                    tx.update(orderRef,{status:'paid',paidAt:firebase.firestore.FieldValue.serverTimestamp()});
-                });
+                await adminOrderApi('admin-approve',{id});
                 showToast('ยืนยันเงินและส่งสินค้าพร้อมขายแล้วค่ะ');
+                await refreshAdminOrders();
             } catch(error) {console.error(error);showToast(error.message||'ยืนยันออร์เดอร์ไม่สำเร็จ');}
             finally {button.disabled=false;}
         }
         async function rejectGuestSlip(id) {
             if(auth?.currentUser?.uid!==ADMIN_UID||!confirm('ให้ลูกค้าส่งสลิปใหม่ใช่ไหมคะ?'))return;
-            try {await db.collection('orders_cakee').doc(id).update({status:'rejected'});showToast('แจ้งให้ส่งสลิปใหม่แล้ว');}
-            catch(error){console.error(error);showToast('อัปเดตไม่สำเร็จ');}
+            try {
+                await adminOrderApi('admin-reject',{id});
+                showToast('แจ้งให้ส่งสลิปใหม่แล้ว');
+                await refreshAdminOrders();
+            } catch(error){console.error(error);showToast(error.message||'อัปเดตไม่สำเร็จ');}
         }
         async function sendCustomDelivery(id,productId,input,fileInput,button) {
             if(auth?.currentUser?.uid!==ADMIN_UID)return;
@@ -5101,16 +5049,58 @@
             button.disabled=true;
             try {
                 const delivery=file?await readDeliveryFile(file):null;
-                await db.collection('orders_cakee').doc(id).collection('deliveries').doc(productId).set({text,fileData:delivery?.fileData||'',cloudinaryPublicId:delivery?.cloudinaryPublicId||'',imageHost:delivery?.imageHost||'',fileName:file?.name||'',deliveredAt:firebase.firestore.FieldValue.serverTimestamp()});
+                await adminOrderApi('admin-custom-delivery',{
+                    id,productId,text,
+                    fileData:delivery?.fileData||'',
+                    cloudinaryPublicId:delivery?.cloudinaryPublicId||'',
+                    imageHost:delivery?.imageHost||'',
+                    fileName:file?.name||''
+                });
                 showToast('ส่งงานแล้วค่ะ');input.value='';fileInput.value='';
+                await refreshAdminOrders();
             } catch(error){console.error(error);showToast(error.message||'ส่งงานไม่สำเร็จ');}
             finally {button.disabled=false;}
+        }
+
+        let receiveScanner=null;
+        function closeReceiveScanner(){
+            const modal=document.getElementById('receiveScannerModal');
+            if(receiveScanner){receiveScanner.stop().catch(()=>{});receiveScanner.clear().catch(()=>{});receiveScanner=null;}
+            modal?.remove();
+        }
+        async function receiveScannedOrder(raw){
+            if(auth?.currentUser?.uid!==ADMIN_UID) return showToast('กรุณาเข้าสู่ระบบแอดมินก่อนค่ะ');
+            const match=String(raw||'').match(/^cakee-receive:v1:(AM-[A-F0-9]{8}):([A-F0-9]{40})$/i);
+            if(!match) return showToast('QR นี้ไม่ใช่ QR รับสินค้าของร้านค่ะ');
+            const token=match[1].slice(3).toLowerCase()+match[2].toLowerCase();
+            try{
+                await adminOrderApi('admin-receive',{id:token});
+                closeReceiveScanner();
+                showToast('ยืนยันรับสินค้าเรียบร้อยแล้วค่ะ');
+                await refreshAdminOrders();
+            }catch(error){console.error(error);showToast(error.message||'ยืนยันรับสินค้าไม่สำเร็จค่ะ');}
+        }
+        async function openReceiveScanner(){
+            if(auth?.currentUser?.uid!==ADMIN_UID)return showToast('กรุณาเข้าสู่ระบบแอดมินก่อนค่ะ');
+            if(typeof Html5Qrcode==='undefined') return showToast('กำลังโหลดระบบกล้อง กรุณาลองอีกครั้งค่ะ');
+            closeReceiveScanner();
+            const modal=document.createElement('div');modal.id='receiveScannerModal';modal.className='fixed inset-0 z-[9999] bg-black/70 flex items-center justify-center p-4';
+            const panel=document.createElement('div');panel.className='bg-white rounded-2xl p-4 w-full max-w-md space-y-3';
+            const title=document.createElement('h3');title.className='font-bold text-[#D870B8] text-lg';title.textContent='สแกน QR รับสินค้า';
+            const reader=document.createElement('div');reader.id='receiveQrReader';reader.className='overflow-hidden rounded-xl';
+            const close=document.createElement('button');close.type='button';close.className='w-full border border-[#F8C8DC] rounded-xl p-2 font-bold';close.textContent='ปิด';close.onclick=closeReceiveScanner;
+            panel.append(title,reader,close);modal.append(panel);document.body.append(modal);
+            receiveScanner=new Html5Qrcode('receiveQrReader');
+            try{
+                await receiveScanner.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:250}},text=>receiveScannedOrder(text),()=>{});
+            }catch(error){console.error(error);closeReceiveScanner();showToast('เปิดกล้องไม่ได้ กรุณาอนุญาตการใช้กล้องหรือใช้มือถือที่รองรับค่ะ');}
         }
 
         window.onload = async () => {
             updateClock();
             try {
                 updateDataLoadingText('กำลังเตรียมหน้าร้าน...');
+                initializeFirebaseSafely();
                 await loadSiteConfigFromFirestore();
 
                 updateDataLoadingText('กำลังโหลดข้อมูล...');
