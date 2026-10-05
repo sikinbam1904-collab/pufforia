@@ -3832,7 +3832,7 @@
             if (!newPass || newPass.length < 6) { showToast("รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร", "fa-exclamation-circle"); return; }
             if (newPass !== confirmPass) { showToast("รหัสผ่านใหม่ไม่ตรงกัน", "fa-times-circle"); return; }
             try {
-                const credential = firebase.auth.EmailAuthProvider.credential(ADMIN_EMAIL, oldPass);
+                const credential = auth.EmailAuthProvider.credential(ADMIN_EMAIL, oldPass);
                 await auth.currentUser.reauthenticateWithCredential(credential);
                 await auth.currentUser.updatePassword(newPass);
                 showToast("เปลี่ยนรหัสผ่านเรียบร้อยแล้วค่ะ 🔑", "fa-check-circle");
