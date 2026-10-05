@@ -5,19 +5,16 @@ function getDb() {
   if (!admin.apps.length) {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
     if (!raw) throw new Error('Missing FIREBASE_SERVICE_ACCOUNT_JSON');
-
     const serviceAccount = JSON.parse(raw);
-
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID
     });
   }
-
   return admin.firestore();
 }
 
-const ADMIN_UID = 'GqZRVXiadraaamU7mLaXamwOPBf2'
+const ADMIN_UID = 'GqZRVXiadraaamU7mLaXamwOPBf2';
 const db = () => getDb();
 const FieldValue = admin.firestore.FieldValue;
 
@@ -35,28 +32,18 @@ function validToken(token) {
 
 async function requireAdmin(req) {
   const header = String(req.headers.authorization || '');
-
-  if (!header.startsWith('Bearer ')) {
-    throw new Error('UNAUTHORIZED');
-  }
-
+  if (!header.startsWith('Bearer ')) throw new Error('UNAUTHORIZED');
   const decoded = await admin.auth().verifyIdToken(header.slice(7));
-
-  if (decoded.uid !== ADMIN_UID) {
-    throw new Error('FORBIDDEN');
-  }
-
+  if (decoded.uid !== ADMIN_UID) throw new Error('FORBIDDEN');
   return decoded;
 }
 
 async function getOrderWithDeliveries(token) {
   const ref = db().collection('orders_cakee').doc(token);
   const snap = await ref.get();
-
   if (!snap.exists) return null;
 
   const deliveriesSnap = await ref.collection('deliveries').get();
-
   const deliveries = deliveriesSnap.docs.map(d => ({
     id: d.id,
     ...d.data()
@@ -97,16 +84,12 @@ async function createOrder(body) {
     throw new Error('จำนวนสินค้าไม่ถูกต้อง');
   }
 
-  if (
-    new Set(normalized.map(x => x.productId)).size !==
-    normalized.length
-  ) {
+  if (new Set(normalized.map(x => x.productId)).size !== normalized.length) {
     throw new Error('พบสินค้าซ้ำในออร์เดอร์');
   }
 
   const token = makeOrderToken();
   const orderRef = db().collection('orders_cakee').doc(token);
-
   let result;
 
   await db().runTransaction(async tx => {
@@ -125,28 +108,20 @@ async function createOrder(body) {
       }
 
       const product = snap.data() || {};
-
-      const priceCents = Math.round(
-        Number(product.priceBaht) * 100
-      );
+      const priceCents = Math.round(Number(product.priceBaht) * 100);
 
       if (!Number.isInteger(priceCents) || priceCents <= 0) {
         throw new Error('ราคาสินค้าไม่ถูกต้อง');
       }
 
       if (product.soldOut) {
-        throw new Error(
-          `${product.title || 'สินค้า'} หมดชั่วคราวค่ะ`
-        );
+        throw new Error(`${product.title || 'สินค้า'} หมดชั่วคราวค่ะ`);
       }
 
       if (product.deliveryType === 'code') {
         const stock = Number(product.stockCount);
 
-        if (
-          !Number.isInteger(stock) ||
-          stock < line.qty
-        ) {
+        if (!Number.isInteger(stock) || stock < line.qty) {
           throw new Error(
             `${product.title || 'สินค้า'} เหลือสินค้า ${
               Number.isInteger(stock) ? stock : 0
@@ -172,17 +147,13 @@ async function createOrder(body) {
 
     const order = {
       orderNo: 'AM-' + token.slice(0, 8).toUpperCase(),
-
       name: clean(body.name, 120),
       contact: clean(body.contact, 120),
       email: clean(body.email, 200),
       note: clean(body.note, 1000),
-
       items,
       totalCents,
-
       status: 'awaiting_slip',
-
       createdAt: FieldValue.serverTimestamp()
     };
 
@@ -207,21 +178,16 @@ async function submitSlip(body) {
 
   const image = String(body.image || '');
 
-  if (!image.startsWith('data:image/')) {
-    throw new Error('ไฟล์สลิปไม่ถูกต้อง');
+  if (!/^data:image\/(jpeg|jpg|png|webp);base64,/i.test(image)) {
+    throw new Error('ไฟล์สลิปต้องเป็น JPG, PNG หรือ WebP');
   }
 
   if (image.length > 700 * 1024) {
     throw new Error('ภาพสลิปใหญ่เกินไป');
   }
 
-  const orderRef = db()
-    .collection('orders_cakee')
-    .doc(token);
-
-  const slipRef = db()
-    .collection('order_slips_cakee')
-    .doc(token);
+  const orderRef = db().collection('orders_cakee').doc(token);
+  const slipRef = db().collection('order_slips_cakee').doc(token);
 
   await db().runTransaction(async tx => {
     const snap = await tx.get(orderRef);
@@ -232,14 +198,8 @@ async function submitSlip(body) {
 
     const order = snap.data() || {};
 
-    if (
-      !['awaiting_slip', 'rejected'].includes(
-        order.status
-      )
-    ) {
-      throw new Error(
-        'ออร์เดอร์นี้ไม่สามารถส่งสลิปซ้ำได้'
-      );
+    if (!['awaiting_slip', 'rejected'].includes(order.status)) {
+      throw new Error('ออร์เดอร์นี้ไม่สามารถส่งสลิปซ้ำได้');
     }
 
     tx.set(slipRef, {
@@ -253,9 +213,7 @@ async function submitSlip(body) {
     });
   });
 
-  return {
-    ok: true
-  };
+  return { ok: true };
 }
 
 async function adminList() {
@@ -294,13 +252,8 @@ async function adminApprove(id) {
     throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
   }
 
-  const orderRef = db()
-    .collection('orders_cakee')
-    .doc(id);
-
-  const slipRef = db()
-    .collection('order_slips_cakee')
-    .doc(id);
+  const orderRef = db().collection('orders_cakee').doc(id);
+  const slipRef = db().collection('order_slips_cakee').doc(id);
 
   await db().runTransaction(async tx => {
     const orderSnap = await tx.get(orderRef);
@@ -315,10 +268,7 @@ async function adminApprove(id) {
     }
 
     const order = orderSnap.data();
-
-    const items = Array.isArray(order.items)
-      ? order.items
-      : [];
+    const items = Array.isArray(order.items) ? order.items : [];
 
     if (
       !items.length ||
@@ -332,23 +282,17 @@ async function adminApprove(id) {
           item.priceCents < 1
       )
     ) {
-      throw new Error(
-        'ข้อมูลสินค้าในออร์เดอร์ไม่ถูกต้อง'
-      );
+      throw new Error('ข้อมูลสินค้าในออร์เดอร์ไม่ถูกต้อง');
     }
 
     if (
-      new Set(items.map(item => item.productId))
-        .size !== items.length ||
+      new Set(items.map(item => item.productId)).size !== items.length ||
       items.reduce(
-        (sum, item) =>
-          sum + item.qty * item.priceCents,
+        (sum, item) => sum + item.qty * item.priceCents,
         0
       ) !== order.totalCents
     ) {
-      throw new Error(
-        'ยอดสินค้าไม่ตรง กรุณาตรวจออร์เดอร์'
-      );
+      throw new Error('ยอดสินค้าไม่ตรง กรุณาตรวจออร์เดอร์');
     }
 
     const productSnaps = [];
@@ -357,9 +301,7 @@ async function adminApprove(id) {
     for (const item of items) {
       productSnaps.push(
         await tx.get(
-          db()
-            .collection('products_cakee')
-            .doc(item.productId)
+          db().collection('products_cakee').doc(item.productId)
         )
       );
 
@@ -379,13 +321,10 @@ async function adminApprove(id) {
 
       if (
         !product ||
-        clean(product.title || 'สินค้า', 120) !==
-          item.title ||
-        Math.round(
-          Number(product.priceBaht) * 100
-        ) !== item.priceCents ||
-        (product.deliveryType || 'custom') !==
-          item.deliveryType
+        clean(product.title || 'สินค้า', 120) !== item.title ||
+        Math.round(Number(product.priceBaht) * 100) !==
+          item.priceCents ||
+        (product.deliveryType || 'custom') !== item.deliveryType
       ) {
         throw new Error(
           'ราคาหรือประเภทสินค้ามีการแก้ไข กรุณาตรวจสอบก่อนยืนยัน'
@@ -396,21 +335,15 @@ async function adminApprove(id) {
 
       if (item.deliveryType === 'file') {
         if (!stock?.fileData) {
-          throw new Error(
-            'ยังไม่มีไฟล์สำหรับ ' + item.title
-          );
+          throw new Error('ยังไม่มีไฟล์สำหรับ ' + item.title);
         }
 
         tx.set(
-          orderRef
-            .collection('deliveries')
-            .doc(item.productId),
+          orderRef.collection('deliveries').doc(item.productId),
           {
             fileData: stock.fileData,
-            fileName:
-              stock.fileName || 'สินค้า',
-            deliveredAt:
-              FieldValue.serverTimestamp()
+            fileName: stock.fileName || 'สินค้า',
+            deliveredAt: FieldValue.serverTimestamp()
           }
         );
       }
@@ -421,39 +354,24 @@ async function adminApprove(id) {
           !Array.isArray(stock.codes) ||
           stock.codes.length < item.qty
         ) {
-          throw new Error(
-            'โค้ดของ ' + item.title + ' ไม่พอ'
-          );
+          throw new Error('โค้ดของ ' + item.title + ' ไม่พอ');
         }
 
         tx.set(
-          orderRef
-            .collection('deliveries')
-            .doc(item.productId),
+          orderRef.collection('deliveries').doc(item.productId),
           {
-            codes: stock.codes.slice(
-              0,
-              item.qty
-            ),
-            deliveredAt:
-              FieldValue.serverTimestamp()
+            codes: stock.codes.slice(0, item.qty),
+            deliveredAt: FieldValue.serverTimestamp()
           }
         );
 
-        tx.update(
-          stockSnaps[index].ref,
-          {
-            codes: stock.codes.slice(item.qty)
-          }
-        );
+        tx.update(stockSnaps[index].ref, {
+          codes: stock.codes.slice(item.qty)
+        });
 
-        tx.update(
-          productSnaps[index].ref,
-          {
-            stockCount:
-              stock.codes.length - item.qty
-          }
-        );
+        tx.update(productSnaps[index].ref, {
+          stockCount: stock.codes.length - item.qty
+        });
       }
     });
 
@@ -463,9 +381,7 @@ async function adminApprove(id) {
     });
   });
 
-  return {
-    ok: true
-  };
+  return { ok: true };
 }
 
 async function adminCustomDelivery(body) {
@@ -473,55 +389,106 @@ async function adminCustomDelivery(body) {
   const productId = clean(body.productId, 200);
 
   if (!validToken(id) || !productId) {
-    throw new Error(
-      'ข้อมูลการส่งงานไม่ถูกต้อง'
-    );
+    throw new Error('ข้อมูลการส่งงานไม่ถูกต้อง');
   }
 
   const text = clean(body.text, 5000);
   const fileData = String(body.fileData || '');
-  const cloudinaryPublicId = clean(
-    body.cloudinaryPublicId,
-    500
-  );
-  const imageHost = clean(
-    body.imageHost,
-    500
-  );
-  const fileName = clean(
-    body.fileName,
-    255
-  );
+  const cloudinaryPublicId = clean(body.cloudinaryPublicId, 500);
+  const imageHost = clean(body.imageHost, 500);
+  const fileName = clean(body.fileName, 255);
 
-  if (
-    !text &&
-    !fileData &&
-    !cloudinaryPublicId &&
-    !imageHost
-  ) {
-    throw new Error(
-      'กรุณาใส่ข้อความหรือเลือกไฟล์ค่ะ'
-    );
+  if (!text && !fileData && !cloudinaryPublicId && !imageHost) {
+    throw new Error('กรุณาใส่ข้อความหรือเลือกไฟล์ค่ะ');
   }
 
-  await db()
-    .collection('orders_cakee')
-    .doc(id)
-    .collection('deliveries')
-    .doc(productId)
-    .set({
-      text,
-      fileData,
-      cloudinaryPublicId,
-      imageHost,
-      fileName,
-      deliveredAt:
-        FieldValue.serverTimestamp()
-    });
+  if (fileData && fileData.length > 450 * 1024) {
+    throw new Error('ไฟล์ส่งงานใหญ่เกินไป');
+  }
 
-  return {
-    ok: true
-  };
+  if (
+    imageHost &&
+    !['cloudinary', 'inline'].includes(imageHost)
+  ) {
+    throw new Error('แหล่งไฟล์ส่งงานไม่ถูกต้อง');
+  }
+
+  const orderRef = db().collection('orders_cakee').doc(id);
+
+  await db().runTransaction(async tx => {
+    const orderSnap = await tx.get(orderRef);
+
+    if (!orderSnap.exists) {
+      throw new Error('ไม่พบออร์เดอร์ค่ะ');
+    }
+
+    const order = orderSnap.data() || {};
+
+    if (order.status !== 'paid') {
+      throw new Error(
+        'ออร์เดอร์นี้ยังไม่อยู่ในสถานะชำระเงินแล้วค่ะ'
+      );
+    }
+
+    const item = Array.isArray(order.items)
+      ? order.items.find(
+          x => x && x.productId === productId
+        )
+      : null;
+
+    if (!item) {
+      throw new Error('สินค้านี้ไม่อยู่ในออร์เดอร์ค่ะ');
+    }
+
+    if (item.deliveryType !== 'custom') {
+      throw new Error('สินค้านี้ไม่ใช่งานแบบกำหนดส่งค่ะ');
+    }
+
+    tx.set(
+      orderRef.collection('deliveries').doc(productId),
+      {
+        text,
+        fileData,
+        cloudinaryPublicId,
+        imageHost,
+        fileName,
+        deliveredAt: FieldValue.serverTimestamp()
+      }
+    );
+  });
+
+  return { ok: true };
+}
+
+async function adminReject(id) {
+  if (!validToken(id)) {
+    throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
+  }
+
+  const ref = db().collection('orders_cakee').doc(id);
+
+  await db().runTransaction(async tx => {
+    const snap = await tx.get(ref);
+
+    if (!snap.exists) {
+      throw new Error('ไม่พบออร์เดอร์ค่ะ');
+    }
+
+    const order = snap.data() || {};
+
+    if (order.status !== 'submitted') {
+      throw new Error(
+        'ออร์เดอร์นี้ไม่อยู่ในสถานะรอตรวจสลิปค่ะ'
+      );
+    }
+
+    tx.update(ref, {
+      status: 'rejected',
+      rejectedAt: FieldValue.serverTimestamp()
+    });
+  });
+
+  return { ok: true };
 }
 
 async function adminCancel(id) {
@@ -529,9 +496,7 @@ async function adminCancel(id) {
     throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
   }
 
-  const ref = db()
-    .collection('orders_cakee')
-    .doc(id);
+  const ref = db().collection('orders_cakee').doc(id);
 
   await db().runTransaction(async tx => {
     const snap = await tx.get(ref);
@@ -547,14 +512,11 @@ async function adminCancel(id) {
 
     tx.update(ref, {
       status: 'cancelled',
-      cancelledAt:
-        FieldValue.serverTimestamp()
+      cancelledAt: FieldValue.serverTimestamp()
     });
   });
 
-  return {
-    ok: true
-  };
+  return { ok: true };
 }
 
 async function adminDelete(id) {
@@ -562,33 +524,22 @@ async function adminDelete(id) {
     throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
   }
 
-  const ref = db()
-    .collection('orders_cakee')
-    .doc(id);
-
-  const deliveries = await ref
-    .collection('deliveries')
-    .get();
+  const ref = db().collection('orders_cakee').doc(id);
+  const deliveries = await ref.collection('deliveries').get();
 
   const batch = db().batch();
 
-  deliveries.docs.forEach(d => {
-    batch.delete(d.ref);
-  });
+  deliveries.docs.forEach(d => batch.delete(d.ref));
 
   batch.delete(
-    db()
-      .collection('order_slips_cakee')
-      .doc(id)
+    db().collection('order_slips_cakee').doc(id)
   );
 
   batch.delete(ref);
 
   await batch.commit();
 
-  return {
-    ok: true
-  };
+  return { ok: true };
 }
 
 async function adminReceive(id) {
@@ -596,9 +547,7 @@ async function adminReceive(id) {
     throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
   }
 
-  const ref = db()
-    .collection('orders_cakee')
-    .doc(id);
+  const ref = db().collection('orders_cakee').doc(id);
 
   await db().runTransaction(async tx => {
     const snap = await tx.get(ref);
@@ -613,9 +562,7 @@ async function adminReceive(id) {
       order.orderNo !==
       'AM-' + id.slice(0, 8).toUpperCase()
     ) {
-      throw new Error(
-        'เลขออร์เดอร์ไม่ตรงกันค่ะ'
-      );
+      throw new Error('เลขออร์เดอร์ไม่ตรงกันค่ะ');
     }
 
     if (order.status !== 'paid') {
@@ -631,15 +578,12 @@ async function adminReceive(id) {
     }
 
     tx.update(ref, {
-      receivedAt:
-        FieldValue.serverTimestamp(),
+      receivedAt: FieldValue.serverTimestamp(),
       receivedBy: ADMIN_UID
     });
   });
 
-  return {
-    ok: true
-  };
+  return { ok: true };
 }
 
 async function adminComplete(id, completed) {
@@ -647,18 +591,79 @@ async function adminComplete(id, completed) {
     throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
   }
 
-  await db()
-    .collection('orders_cakee')
-    .doc(id)
-    .update({
+  const ref = db().collection('orders_cakee').doc(id);
+
+  await db().runTransaction(async tx => {
+    const snap = await tx.get(ref);
+
+    if (!snap.exists) {
+      throw new Error('ไม่พบออร์เดอร์ค่ะ');
+    }
+
+    const order = snap.data() || {};
+
+    if (order.status !== 'paid') {
+      throw new Error(
+        'ออร์เดอร์นี้ยังไม่ได้ยืนยันการชำระเงินค่ะ'
+      );
+    }
+
+    if (completed) {
+      const items = Array.isArray(order.items)
+        ? order.items
+        : [];
+
+      const customItems = items.filter(
+        item =>
+          item &&
+          item.deliveryType === 'custom'
+      );
+
+      if (
+        items.some(
+          item =>
+            item &&
+            item.deliveryType !== 'custom'
+        ) &&
+        !order.receivedAt
+      ) {
+        throw new Error(
+          'กรุณาสแกนรับสินค้า/ยืนยันการรับสินค้าก่อนค่ะ'
+        );
+      }
+
+      for (const item of customItems) {
+        const deliverySnap = await tx.get(
+          ref
+            .collection('deliveries')
+            .doc(item.productId)
+        );
+
+        const delivery = deliverySnap.exists
+          ? deliverySnap.data() || {}
+          : {};
+
+        if (
+          !delivery.text &&
+          !delivery.fileData &&
+          !delivery.cloudinaryPublicId
+        ) {
+          throw new Error(
+            'ยังส่งงานไม่ครบสำหรับ ' +
+              (item.title || 'สินค้ารายการนี้')
+          );
+        }
+      }
+    }
+
+    tx.update(ref, {
       completedAt: completed
         ? FieldValue.serverTimestamp()
         : FieldValue.delete()
     });
+  });
 
-  return {
-    ok: true
-  };
+  return { ok: true };
 }
 
 module.exports = async (req, res) => {
@@ -690,14 +695,12 @@ module.exports = async (req, res) => {
         });
       }
 
-      const order =
-        await getOrderWithDeliveries(token);
+      const order = await getOrderWithDeliveries(token);
 
       if (
         !order ||
         order.orderNo !==
-          'AM-' +
-            token.slice(0, 8).toUpperCase()
+          'AM-' + token.slice(0, 8).toUpperCase()
       ) {
         return send(res, 404, {
           ok: false,
@@ -748,16 +751,13 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'admin-reject') {
-      await db()
-        .collection('orders_cakee')
-        .doc(clean(body.id, 100))
-        .update({
-          status: 'rejected'
-        });
-
-      return send(res, 200, {
-        ok: true
-      });
+      return send(
+        res,
+        200,
+        await adminReject(
+          clean(body.id, 100)
+        )
+      );
     }
 
     if (action === 'admin-cancel') {
@@ -813,11 +813,9 @@ module.exports = async (req, res) => {
       ok: false,
       error: 'Unknown action'
     });
+
   } catch (error) {
-    console.error(
-      'order api error',
-      error
-    );
+    console.error('order api error', error);
 
     const status =
       error.message === 'UNAUTHORIZED'
