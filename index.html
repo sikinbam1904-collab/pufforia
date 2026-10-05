@@ -1888,43 +1888,35 @@
         let auth = null;
         let firebaseReady = false;
 
-        // Firebase initialization
-        // IMPORTANT: do not initialize Firebase while the main script is still
-        // being parsed. Wait for window.load so all Firebase Compat libraries
-        // are guaranteed to be available, then create/reuse the DEFAULT app.
+        // Firebase bootstrap — the important part is checking for the
+        // *DEFAULT* app specifically. firebase.apps.length can be true even
+        // when only a named app exists, and firebase.app() would then throw:
+        // "The default Firebase app does not exist."
         function initializeFirebaseSafely() {
             if (firebaseReady && db && auth) return true;
 
             if (!firebaseConfig.apiKey) {
-                console.error('Firebase config is missing apiKey.');
+                console.error('[Firebase] Missing apiKey in firebaseConfig.');
                 return false;
             }
 
-            if (typeof firebase === 'undefined' || !firebase.initializeApp) {
-                console.error('Firebase SDK has not finished loading.');
+            if (typeof firebase === 'undefined' || typeof firebase.initializeApp !== 'function') {
+                console.error('[Firebase] Firebase Compat SDK has not loaded.');
                 return false;
             }
 
             try {
-                // Firebase services in this file expect the DEFAULT app.
-                // Always make sure the default app exists before getting Auth
-                // or Firestore. This fixes:
-                // "The default Firebase app does not exist..."
-                let app;
-                if (Array.isArray(firebase.apps) && firebase.apps.length > 0) {
-                    app = firebase.app();
-                } else {
+                const apps = Array.isArray(firebase.apps) ? firebase.apps : [];
+                let app = apps.find(existing => existing && existing.name === '[DEFAULT]');
+
+                // Only reuse the DEFAULT app. Ignore any named Firebase apps.
+                if (!app) {
                     app = firebase.initializeApp(firebaseConfig);
                 }
 
-                // Use the default app explicitly. Do not call these before
-                // initializeApp() has completed.
+                // These services now have a guaranteed DEFAULT Firebase app.
                 db = firebase.firestore();
                 auth = firebase.auth();
-
-                if (!db || !auth) {
-                    throw new Error('Firebase Auth/Firestore could not be initialized.');
-                }
 
                 firebaseReady = true;
 
@@ -1946,19 +1938,19 @@
                     }
                 });
 
-                console.log('Firebase initialized successfully:', app.name || '[DEFAULT]');
+                console.info('[Firebase] DEFAULT app ready:', app.name);
                 return true;
             } catch (error) {
                 firebaseReady = false;
                 db = null;
                 auth = null;
-                console.error('Error initializing Firebase:', error);
+                console.error('[Firebase] initialization failed:', error);
                 return false;
             }
         }
 
-        // Do NOT call initializeFirebaseSafely() here.
-        // window.onload below is the single startup entry point.
+        // Do not initialize here. The startup handler below initializes Firebase
+        // once, after the page has loaded.
 
         let categories = [];
 
@@ -5136,7 +5128,7 @@
 
                 const firebaseOk = initializeFirebaseSafely();
                 if (!firebaseOk) {
-                    throw new Error('Firebase initialization failed. Please check the Firebase SDK and configuration.');
+                    throw new Error('Firebase DEFAULT app initialization failed.');
                 }
 
                 await loadSiteConfigFromFirestore();
