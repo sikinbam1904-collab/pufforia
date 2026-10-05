@@ -123,12 +123,67 @@ async function createOrder(body) {
   return result;
 }
 
-async function submitSlip(body) {
-  const token = clean(body.token, 100);
-  if (!validToken(token)) throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
-  const image = String(body.image || '');
-  if (!validSlipImage(image)) throw new Error('ไฟล์สลิปต้องเป็น JPG, PNG หรือ WebP และมีขนาดไม่เกิน 700 KB');
+async function verifyEasySlip(image, order) {
+  const apiKey = String(process.env.EASYSLIP_API_KEY || '').trim();
+  if (!apiKey) throw new Error('EASYSLIP_NOT_CONFIGURED');
 
+  const matchAccount = String(process.env.EASYSLIP_MATCH_ACCOUNT || '').toLowerCase() === 'true';
+  const amountBaht = Number(order.totalCents) / 100;
+  const payload = {
+    base64: image,
+    remark: clean(order.orderNo || '', 255),
+    matchAmount: amountBaht,
+    checkDuplicate: true
+  };
+  if (matchAccount) payload.matchAccount = true;
+
+  const response = await fetch('https://api.easyslip.com/v2/verify/bank', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.success) {
+    const code = result?.error?.code || `HTTP_${response.status}`;
+    const message = result?.error?.message || 'EasySlip ตรวจสลิปไม่สำเร็จ';
+    const error = new Error(message);
+    error.code = code;
+    throw error;
+  }
+
+  const data = result.data || {};
+  const amountInSlip = Number(data.amountInSlip ?? data.rawSlip?.amount?.amount);
+  const amountMatched = data.isAmountMatched === true ||
+    (Number.isFinite(amountInSlip) && amountInSlip === amountBaht);
+  const accountMatched = !matchAccount || data.matchedAccount != null;
+
+  if (data.isDuplicate === true) {
+    const error = new Error('สลิปนี้เคยถูกตรวจสอบแล้วค่ะ');
+    error.code = 'DUPLICATE_SLIP';
+    throw error;
+  }
+  if (!amountMatched) {
+    const error = new Error(`ยอดในสลิปไม่ตรงกับยอดออร์เดอร์ค่ะ (${Number.isFinite(amountInSlip) ? amountInSlip.toFixed(2) : '-'} บาท)`);
+    error.code = 'AMOUNT_MISMATCH';
+    throw error;
+  }
+  if (!accountMatched) {
+    const error = new Error('บัญชีผู้รับในสลิปไม่ตรงกับบัญชีร้านที่ลงทะเบียนกับ EasySlip ค่ะ');
+    error.code = 'ACCOUNT_MISMATCH';
+    throw error;
+  }
+
+  return {
+    data,
+    message: result.message || 'Bank slip verified successfully'
+  };
+}
+
+async function saveSubmittedSlip(token, image, verification = {}) {
   const orderRef = db().collection('orders_cakee').doc(token);
   const slipRef = db().collection('order_slips_cakee').doc(token);
   await db().runTransaction(async tx => {
@@ -136,10 +191,77 @@ async function submitSlip(body) {
     if (!snap.exists) throw new Error('ไม่พบออร์เดอร์ค่ะ');
     const order = snap.data() || {};
     if (!['awaiting_slip', 'rejected'].includes(order.status)) throw new Error('ออร์เดอร์นี้ไม่สามารถส่งสลิปซ้ำได้');
-    tx.set(slipRef, { image, imageHost: 'base64', submittedAt: FieldValue.serverTimestamp() });
+    tx.set(slipRef, {
+      image,
+      imageHost: 'base64',
+      submittedAt: FieldValue.serverTimestamp(),
+      verificationStatus: verification.status || 'pending',
+      verificationCode: clean(verification.code || '', 80),
+      verificationMessage: clean(verification.message || '', 500),
+      verifiedAt: verification.status === 'verified' ? FieldValue.serverTimestamp() : FieldValue.delete(),
+      easySlipData: verification.data || FieldValue.delete()
+    });
     tx.update(orderRef, { status: 'submitted' });
   });
-  return { ok: true };
+}
+
+async function submitSlip(body) {
+  const token = clean(body.token, 100);
+  if (!validToken(token)) throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
+  const image = String(body.image || '');
+  if (!validSlipImage(image)) throw new Error('ไฟล์สลิปต้องเป็น JPG, PNG หรือ WebP และมีขนาดไม่เกิน 700 KB');
+
+  const order = await getOrderWithDeliveries(token);
+  if (!order) throw new Error('ไม่พบออร์เดอร์ค่ะ');
+  if (!['awaiting_slip', 'rejected'].includes(order.status)) throw new Error('ออร์เดอร์นี้ไม่สามารถส่งสลิปซ้ำได้');
+
+  try {
+    const verification = await verifyEasySlip(image, order);
+    await saveSubmittedSlip(token, image, {
+      status: 'verified',
+      code: '',
+      message: verification.message,
+      data: verification.data
+    });
+
+    try {
+      await adminApprove(token);
+      return { ok: true, verified: true, message: 'ตรวจสลิปสำเร็จและยืนยันการชำระเงินแล้วค่ะ' };
+    } catch (approvalError) {
+      console.error('EasySlip verified but automatic fulfillment failed', approvalError);
+      return { ok: true, verified: true, manualReview: true, message: 'ตรวจสลิปผ่านแล้ว แต่ระบบส่งสินค้าอัตโนมัติไม่สำเร็จ กรุณาให้แอดมินตรวจออร์เดอร์ค่ะ' };
+    }
+  } catch (error) {
+    console.error('EasySlip verification failed', error);
+    const code = error.code || 'EASYSLIP_ERROR';
+    const manualReviewCodes = new Set([
+      'EASYSLIP_NOT_CONFIGURED',
+      'INVALID_API_KEY',
+      'IP_NOT_ALLOWED',
+      'QUOTA_EXCEEDED',
+      'BRANCH_INACTIVE',
+      'SERVICE_BANNED',
+      'SERVICE_DELETED',
+      'API_SERVER_ERROR',
+      'HTTP_401',
+      'HTTP_403',
+      'HTTP_429',
+      'HTTP_500',
+      'HTTP_502',
+      'HTTP_503'
+    ]);
+
+    if (manualReviewCodes.has(code)) {
+      await saveSubmittedSlip(token, image, {
+        status: 'manual_review',
+        code,
+        message: error.message
+      });
+      return { ok: true, verified: false, manualReview: true, message: 'ส่งสลิปแล้วค่ะ ระบบตรวจอัตโนมัติขัดข้อง จึงส่งให้แอดมินตรวจสอบค่ะ' };
+    }
+
+    throw error;
+  }
 }
 
 async function adminList() {
