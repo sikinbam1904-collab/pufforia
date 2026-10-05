@@ -1886,11 +1886,24 @@
 
         let db = null;
         let auth = null;
-        if (firebaseConfig.apiKey) {
+        let firebaseReady = false;
+
+        // Initialize Firebase only after all Compat libraries are loaded.
+        // This also safely reuses an existing default app instead of calling
+        // Firebase services before a default app exists.
+        function initializeFirebaseSafely() {
+            if (firebaseReady && db && auth) return true;
+            if (!firebaseConfig.apiKey || typeof firebase === 'undefined') return false;
+
             try {
-                firebase.initializeApp(firebaseConfig);
-                db = firebase.firestore();
-                auth = firebase.auth();
+                const app = firebase.apps && firebase.apps.length
+                    ? firebase.app()
+                    : firebase.initializeApp(firebaseConfig);
+
+                db = firebase.firestore(app);
+                auth = firebase.auth(app);
+                firebaseReady = true;
+
                 auth.onAuthStateChanged((user) => {
                     isAdminLoggedIn = !!user && user.uid === ADMIN_UID;
                     updateAdminLockIcon();
@@ -1901,10 +1914,18 @@
                     if (isAdminLoggedIn) { listenAdminOrders(); syncLegacyCodeStockCounts(); }
                     else { if (unsubscribeAdminOrders) unsubscribeAdminOrders(); unsubscribeAdminOrders=null; adminOrders=[]; renderAdminOrders(); }
                 });
+
+                return true;
             } catch (error) {
-                console.error("Error initializing Firebase:", error);
+                firebaseReady = false;
+                db = null;
+                auth = null;
+                console.error('Error initializing Firebase:', error);
+                return false;
             }
         }
+
+        initializeFirebaseSafely();
 
         let categories = [];
 
@@ -5079,6 +5100,7 @@
             updateClock();
             try {
                 updateDataLoadingText('กำลังเตรียมหน้าร้าน...');
+                initializeFirebaseSafely();
                 await loadSiteConfigFromFirestore();
 
                 updateDataLoadingText('กำลังโหลดข้อมูล...');
