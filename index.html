@@ -1906,17 +1906,18 @@
             }
 
             try {
-                const apps = Array.isArray(firebase.apps) ? firebase.apps : [];
-                let app = apps.find(existing => existing && existing.name === '[DEFAULT]');
-
-                // Only reuse the DEFAULT app. Ignore any named Firebase apps.
-                if (!app) {
+                // Always obtain/create the DEFAULT app first. Using the app instance
+                // for Firestore/Auth avoids the "default Firebase app does not exist"
+                // race that can happen when another script touches a service early.
+                let app;
+                try {
+                    app = firebase.app();
+                } catch (_) {
                     app = firebase.initializeApp(firebaseConfig);
                 }
 
-                // These services now have a guaranteed DEFAULT Firebase app.
-                db = firebase.firestore();
-                auth = firebase.auth();
+                db = app.firestore();
+                auth = app.auth();
 
                 firebaseReady = true;
 
@@ -4064,7 +4065,21 @@
         }
 
         function startAddProduct() {
-            if (isAdminLoggedIn) openProductModal(null, activeShopTab);
+            // Safety net: make sure Firebase is initialized even if the user taps
+            // the add-product button before the startup callback finishes.
+            if (!firebaseReady || !db || !auth) {
+                const ready = initializeFirebaseSafely();
+                if (!ready) {
+                    showToast('Firebase ยังไม่พร้อมใช้งาน กรุณารีเฟรชหน้าเว็บแล้วลองใหม่ค่ะ', 'fa-times-circle');
+                    return;
+                }
+            }
+            if (isAdminLoggedIn && auth?.currentUser?.uid === ADMIN_UID) {
+                openProductModal(null, activeShopTab);
+            } else {
+                pendingProductCreate = true;
+                openAdminLoginModal();
+            }
         }
 
         function switchShopTab(tabName, subcategoryId = null) {
@@ -4316,7 +4331,14 @@
         }
 
         function openProductModal(id = null, category = activeShopTab) {
-            if (!isAdminLoggedIn) return;
+            if (!firebaseReady || !db || !auth) {
+                const ready = initializeFirebaseSafely();
+                if (!ready) {
+                    showToast('Firebase ยังไม่พร้อมใช้งาน กรุณารีเฟรชหน้าเว็บแล้วลองใหม่ค่ะ', 'fa-times-circle');
+                    return;
+                }
+            }
+            if (!isAdminLoggedIn || auth?.currentUser?.uid !== ADMIN_UID) return;
             const prod = productsData.find(p => p.id === id);
             document.getElementById('productEditId').value = prod?.id || '';
             const select = document.getElementById('productCategory');
