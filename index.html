@@ -28,6 +28,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script>window.__firebaseSdkReady = Promise.resolve();</script>
 
     <style>
         .theme-color-row { display: grid; grid-template-columns: minmax(0,1fr) 50px; gap: 8px; align-items: end; }
@@ -1900,20 +1901,25 @@
                 return false;
             }
 
-            if (typeof firebase === 'undefined' || typeof firebase.initializeApp !== 'function') {
-                console.error('[Firebase] Firebase Compat SDK has not loaded.');
+            if (typeof window.firebase === 'undefined' ||
+                typeof window.firebase.initializeApp !== 'function' ||
+                typeof window.firebase.firestore !== 'function' ||
+                typeof window.firebase.auth !== 'function') {
+                console.error('[Firebase] Firebase Compat SDK has not loaded yet.');
                 return false;
             }
 
             try {
-                // Always obtain/create the DEFAULT app first. Using the app instance
-                // for Firestore/Auth avoids the "default Firebase app does not exist"
-                // race that can happen when another script touches a service early.
+                // Explicitly create/obtain the DEFAULT Firebase app first.
                 let app;
-                try {
-                    app = firebase.app();
-                } catch (_) {
-                    app = firebase.initializeApp(firebaseConfig);
+                if (window.firebase.apps && window.firebase.apps.length > 0) {
+                    try {
+                        app = window.firebase.app();
+                    } catch (_) {
+                        app = window.firebase.initializeApp(firebaseConfig);
+                    }
+                } else {
+                    app = window.firebase.initializeApp(firebaseConfig);
                 }
 
                 db = app.firestore();
@@ -4889,19 +4895,19 @@
             button.disabled=true;
             try {
                 const image=await compressToBase64Image(file,{maxDimension:1600,quality:0.82,maxDataUrlBytes:500*1024});
-                const accessCode=token.slice(8).toUpperCase();
-                const response=await fetch('/api/verify-slip',{
-                    method:'POST',headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({token,accessCode,base64:image})
+                const response=await fetch('/api/order',{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({action:'submit-slip',token,image})
                 });
                 const result=await response.json().catch(()=>({}));
-                if(!response.ok || !result.success) throw new Error(result.message||'ตรวจสลิปไม่สำเร็จค่ะ');
-                showToast('ตรวจสลิปสำเร็จค่ะ ยืนยันการชำระเงินแล้ว');
+                if(!response.ok || !result.ok) throw new Error(result.error||'ส่งสลิปไม่สำเร็จค่ะ');
+                showToast('ส่งสลิปให้แอดมินตรวจแล้วค่ะ');
                 input.value='';
                 await lookupGuestOrder();
             } catch(error) {
-                console.error('Automatic slip verification failed',error);
-                showToast(error.message||'ตรวจสลิปไม่สำเร็จค่ะ กรุณาลองใหม่อีกครั้ง');
+                console.error('Slip upload failed',error);
+                showToast(error.message||'ส่งสลิปไม่สำเร็จค่ะ กรุณาลองใหม่อีกครั้ง');
             } finally {button.disabled=false;}
         }
         function readSmallFile(file,maxBytes=300*1024) {
@@ -5147,6 +5153,9 @@
             updateClock();
             try {
                 updateDataLoadingText('กำลังเตรียมหน้าร้าน...');
+
+                await window.__firebaseSdkReady;
+                await new Promise(resolve => setTimeout(resolve, 0));
 
                 const firebaseOk = initializeFirebaseSafely();
                 if (!firebaseOk) {
