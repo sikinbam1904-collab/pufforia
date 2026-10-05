@@ -1604,8 +1604,8 @@
     <script>
         // LocalStorage Keys
         const STORAGE_CONFIG = 'shop_template_config_v1';
-        const ADMIN_EMAIL = 'nuttanunjaikhod@gmail.com'; // Firebase Authentication > Users: admin email
-        const ADMIN_UID = 'HX4WDnF8UdhwWiHgBWmb1f7PIRw2'; // Firebase Authentication > Users: admin UID
+        const ADMIN_EMAIL = 'feurdelystore@gmail.com'; // Firebase Authentication > Users: admin email
+        const ADMIN_UID = 'GqZRVXiadraaamU7mLaXamwOPBf2'; // Firebase Authentication > Users: admin UID
         const DEFAULT_COVER_IMAGE = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="450"><rect width="1200" height="450" fill="#FFE1F0"/><circle cx="1050" cy="80" r="240" fill="#E8F6FF"/><text x="600" y="245" text-anchor="middle" fill="#D870B8" font-size="58" font-family="sans-serif">YOUR SHOP</text></svg>');
         const PREVIOUS_DEFAULT_COVER_IMAGE = '';
 
@@ -1854,13 +1854,13 @@
         // Firebase Config
         // For Firebase JS SDK v7.20.0 and later, measurementId is optional
         const firebaseConfig = {
-            apiKey: "AIzaSyCZxkwVEyVjTi9q-lY8-J6WwI-oqCBLDNk",
-  authDomain: "lemon-23f90.firebaseapp.com",
-  projectId: "lemon-23f90",
-  storageBucket: "lemon-23f90.firebasestorage.app",
-  messagingSenderId: "12151124612",
-  appId: "1:12151124612:web:291a7ce49ee8a74ae488d1",
-  measurementId: "G-8YXL146Q6P"
+            apiKey: "AIzaSyDPNU5jV_X_Y3L_QNoC-RnoHLR6-_PGatQ",
+            authDomain: "pufforia-977d1.firebaseapp.com",
+            projectId: "pufforia-977d1",
+            storageBucket: "pufforia-977d1.firebasestorage.app",
+            messagingSenderId: "544134986486",
+            appId: "1:544134986486:web:b0b3175d5b19766f844ad7",
+            measurementId: "G-D225Y1GSV6"
         };
 
         let db = null;
@@ -1870,16 +1870,13 @@
         function initializeFirebaseSafely() {
             if (firebaseReady && db && auth) return true;
             if (!firebaseConfig.apiKey || typeof firebase === 'undefined') return false;
-
             try {
-                const app = (firebase.apps && firebase.apps.length)
+                const app = firebase.apps && firebase.apps.length
                     ? firebase.app()
                     : firebase.initializeApp(firebaseConfig);
-
                 db = firebase.firestore(app);
                 auth = firebase.auth(app);
                 firebaseReady = true;
-
                 auth.onAuthStateChanged((user) => {
                     isAdminLoggedIn = !!user && user.uid === ADMIN_UID;
                     updateAdminLockIcon();
@@ -1890,7 +1887,6 @@
                     if (isAdminLoggedIn) { listenAdminOrders(); syncLegacyCodeStockCounts(); }
                     else { if (unsubscribeAdminOrders) unsubscribeAdminOrders(); unsubscribeAdminOrders=null; adminOrders=[]; renderAdminOrders(); }
                 });
-
                 return true;
             } catch (error) {
                 firebaseReady = false;
