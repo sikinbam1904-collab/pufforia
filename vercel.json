@@ -1,5 +1,8 @@
 {
-  "rewrites": [
-    { "source": "/", "destination": "/api/social-preview" }
-  ]
+  "version": 2,
+  "functions": {
+    "api/order.js": {
+      "runtime": "nodejs20.x"
+    }
+  }
 }
