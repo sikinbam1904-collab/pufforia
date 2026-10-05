@@ -1888,20 +1888,44 @@
         let auth = null;
         let firebaseReady = false;
 
-        // Initialize Firebase only after all Compat libraries are loaded.
-        // This also safely reuses an existing default app instead of calling
-        // Firebase services before a default app exists.
+        // Firebase initialization
+        // IMPORTANT: do not initialize Firebase while the main script is still
+        // being parsed. Wait for window.load so all Firebase Compat libraries
+        // are guaranteed to be available, then create/reuse the DEFAULT app.
         function initializeFirebaseSafely() {
             if (firebaseReady && db && auth) return true;
-            if (!firebaseConfig.apiKey || typeof firebase === 'undefined') return false;
+
+            if (!firebaseConfig.apiKey) {
+                console.error('Firebase config is missing apiKey.');
+                return false;
+            }
+
+            if (typeof firebase === 'undefined' || !firebase.initializeApp) {
+                console.error('Firebase SDK has not finished loading.');
+                return false;
+            }
 
             try {
-                const app = firebase.apps && firebase.apps.length
-                    ? firebase.app()
-                    : firebase.initializeApp(firebaseConfig);
+                // Firebase services in this file expect the DEFAULT app.
+                // Always make sure the default app exists before getting Auth
+                // or Firestore. This fixes:
+                // "The default Firebase app does not exist..."
+                let app;
+                if (Array.isArray(firebase.apps) && firebase.apps.length > 0) {
+                    app = firebase.app();
+                } else {
+                    app = firebase.initializeApp(firebaseConfig);
+                }
 
-                db = firebase.firestore(app);
-                auth = firebase.auth(app);
+                // Use the default app explicitly. Do not call these before
+                // initializeApp() has completed.
+                db = firebase.firestore();
+                auth = firebase.auth();
+
+                if (!db || !auth) {
+                    throw new Error('Firebase Auth/Firestore could not be initialized.');
+                }
+
                 firebaseReady = true;
 
                 auth.onAuthStateChanged((user) => {
@@ -1911,10 +1935,18 @@
                     if (document.getElementById('queueListContainer')) renderQueueList();
                     if (document.getElementById('pointsContainer')) renderPoints();
                     if (activeShopTab !== 'home' && !productDetailOpen) renderProductCategory(activeShopTab);
-                    if (isAdminLoggedIn) { listenAdminOrders(); syncLegacyCodeStockCounts(); }
-                    else { if (unsubscribeAdminOrders) unsubscribeAdminOrders(); unsubscribeAdminOrders=null; adminOrders=[]; renderAdminOrders(); }
+                    if (isAdminLoggedIn) {
+                        listenAdminOrders();
+                        syncLegacyCodeStockCounts();
+                    } else {
+                        if (unsubscribeAdminOrders) unsubscribeAdminOrders();
+                        unsubscribeAdminOrders = null;
+                        adminOrders = [];
+                        renderAdminOrders();
+                    }
                 });
 
+                console.log('Firebase initialized successfully:', app.name || '[DEFAULT]');
                 return true;
             } catch (error) {
                 firebaseReady = false;
@@ -1925,7 +1957,8 @@
             }
         }
 
-        initializeFirebaseSafely();
+        // Do NOT call initializeFirebaseSafely() here.
+        // window.onload below is the single startup entry point.
 
         let categories = [];
 
@@ -5100,7 +5133,12 @@
             updateClock();
             try {
                 updateDataLoadingText('กำลังเตรียมหน้าร้าน...');
-                initializeFirebaseSafely();
+
+                const firebaseOk = initializeFirebaseSafely();
+                if (!firebaseOk) {
+                    throw new Error('Firebase initialization failed. Please check the Firebase SDK and configuration.');
+                }
+
                 await loadSiteConfigFromFirestore();
 
                 updateDataLoadingText('กำลังโหลดข้อมูล...');
