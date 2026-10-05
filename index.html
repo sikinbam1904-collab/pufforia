@@ -4352,6 +4352,8 @@
         }
 
         function openProductModal(id = null, category = activeShopTab) {
+            // Open the modal first so an error while preparing product data
+            // can never make the Add Product button appear unresponsive.
             if (!firebaseReady || !db || !auth) {
                 const ready = initializeFirebaseSafely();
                 if (!ready) {
@@ -4360,40 +4362,116 @@
                 }
             }
             if (!isAdminLoggedIn || auth?.currentUser?.uid !== ADMIN_UID) return;
-            const prod = productsData.find(p => p.id === id);
-            document.getElementById('productEditId').value = prod?.id || '';
-            const select = document.getElementById('productCategory');
-            select.replaceChildren();
-            siteConfig.shopCategories.forEach(item => {
-                const option = document.createElement('option'); option.value = item.id;
-                option.textContent = [item.icon,item.title].filter(Boolean).join(' ') || `หมวดสินค้า ${select.children.length + 1}`; select.append(option);
-            });
-            select.value = prod?.category || (shopCategoryById(category) ? category : siteConfig.shopCategories[0]?.id || '');
-            updateProductSubcategoryOptions(prod ? productSubcategoryId(prod, select.value) : (category === activeShopTab ? activeSubcategoryId : null));
-            document.getElementById('productTitle').value = prod?.title || '';
-            document.getElementById('productPrice').value = prod?.price || '';
-            document.getElementById('productPriceBaht').value = prod?.priceBaht || '';
-            document.getElementById('productDeliveryType').value = prod?.deliveryType || 'custom';
-            document.getElementById('productSoldOut').checked = !!prod?.soldOut;
-            productCodeInventoryReady = false;
-            productCodeOriginal = [];
-            renderProductCodeInputs(['']);
-            document.getElementById('productDeliveryFile').value = '';
-            updateDeliveryFields();
-            loadProductDeliveryInfo(prod?.id, ++productCodeLoadVersion);
-            document.getElementById('productDescription').value = prod?.description || '';
-            document.getElementById('productLink').value = prod?.link || '';
-            document.getElementById('productLinkText').value = prod?.linkText || '';
-            document.getElementById('productImage').value = '';
-            productImageData = prod?.image || '';
-            pendingProductLegacyRemoval = false;
-            pendingProductPhotoDeletes = new Set();
-            const preview = document.getElementById('productImagePreview');
-            preview.src = productImageData || '';
-            preview.classList.toggle('hidden', !productImageData);
-            renderProductImagesAdmin(prod);
-            document.getElementById('productModalHeading').textContent = prod ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า';
-            document.getElementById('productModal').classList.add('active');
+
+            const modal = document.getElementById('productModal');
+            if (!modal) {
+                console.error('[Product Modal] ไม่พบ #productModal ในหน้าเว็บ');
+                showToast('ไม่พบหน้าต่างเพิ่มสินค้า กรุณารีเฟรชหน้าเว็บค่ะ', 'fa-times-circle');
+                return;
+            }
+
+            // IMPORTANT: show the popup before any data preparation that may throw.
+            modal.classList.add('active');
+
+            try {
+                const prod = Array.isArray(productsData) ? productsData.find(p => p.id === id) : null;
+                const categories = Array.isArray(siteConfig?.shopCategories) ? siteConfig.shopCategories : [];
+
+                const editId = document.getElementById('productEditId');
+                if (editId) editId.value = prod?.id || '';
+
+                const select = document.getElementById('productCategory');
+                if (select) {
+                    select.replaceChildren();
+                    categories.forEach(item => {
+                        const option = document.createElement('option');
+                        option.value = item.id;
+                        option.textContent = [item.icon, item.title].filter(Boolean).join(' ')
+                            || `หมวดสินค้า ${select.children.length + 1}`;
+                        select.append(option);
+                    });
+
+                    let selectedCategory = prod?.category || '';
+                    if (!selectedCategory && typeof shopCategoryById === 'function' && shopCategoryById(category)) {
+                        selectedCategory = category;
+                    }
+                    if (!selectedCategory) selectedCategory = categories[0]?.id || '';
+                    select.value = selectedCategory;
+
+                    if (typeof updateProductSubcategoryOptions === 'function') {
+                        const selectedSubcategory = prod
+                            ? productSubcategoryId(prod, selectedCategory)
+                            : (category === activeShopTab ? activeSubcategoryId : null);
+                        updateProductSubcategoryOptions(selectedSubcategory);
+                    }
+                }
+
+                const title = document.getElementById('productTitle');
+                if (title) title.value = prod?.title || '';
+
+                const price = document.getElementById('productPrice');
+                if (price) price.value = prod?.price || '';
+
+                const priceBaht = document.getElementById('productPriceBaht');
+                if (priceBaht) priceBaht.value = prod?.priceBaht || '';
+
+                const deliveryType = document.getElementById('productDeliveryType');
+                if (deliveryType) deliveryType.value = prod?.deliveryType || 'custom';
+
+                const soldOut = document.getElementById('productSoldOut');
+                if (soldOut) soldOut.checked = !!prod?.soldOut;
+
+                productCodeInventoryReady = false;
+                productCodeOriginal = [];
+                if (typeof renderProductCodeInputs === 'function') {
+                    renderProductCodeInputs(['']);
+                }
+
+                const deliveryFile = document.getElementById('productDeliveryFile');
+                if (deliveryFile) deliveryFile.value = '';
+
+                if (typeof updateDeliveryFields === 'function') {
+                    updateDeliveryFields();
+                }
+                if (typeof loadProductDeliveryInfo === 'function') {
+                    loadProductDeliveryInfo(prod?.id, ++productCodeLoadVersion);
+                }
+
+                const description = document.getElementById('productDescription');
+                if (description) description.value = prod?.description || '';
+
+                const link = document.getElementById('productLink');
+                if (link) link.value = prod?.link || '';
+
+                const linkText = document.getElementById('productLinkText');
+                if (linkText) linkText.value = prod?.linkText || '';
+
+                const imageInput = document.getElementById('productImage');
+                if (imageInput) imageInput.value = '';
+
+                productImageData = prod?.image || '';
+                pendingProductLegacyRemoval = false;
+                pendingProductPhotoDeletes = new Set();
+
+                const preview = document.getElementById('productImagePreview');
+                if (preview) {
+                    preview.src = productImageData || '';
+                    preview.classList.toggle('hidden', !productImageData);
+                }
+
+                if (typeof renderProductImagesAdmin === 'function') {
+                    renderProductImagesAdmin(prod);
+                }
+
+                const heading = document.getElementById('productModalHeading');
+                if (heading) heading.textContent = prod ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า';
+
+            } catch (error) {
+                // The popup is already visible, so a secondary data error cannot
+                // make the Add Product button appear completely unresponsive.
+                console.error('[Product Modal] เตรียมข้อมูลสินค้าไม่สำเร็จ:', error);
+                showToast('เปิดหน้าต่างสินค้าแล้ว แต่ข้อมูลบางส่วนโหลดไม่สำเร็จค่ะ', 'fa-exclamation-circle');
+            }
         }
 
         function updateProductSubcategoryOptions(selectedId = null) {
