@@ -455,44 +455,6 @@
             overflow-x: auto; scrollbar-width: thin;
         }
         .shop-bottom-bar.shop-bottom-bar-hidden { display: none !important; }
-        .shop-sales-button, .shop-activity-button {
-            position: absolute; right: 5%; bottom: 92px; z-index: 110;
-            min-height: 43px; padding: 0 12px;
-            display: none; gap: 7px; align-items: center; justify-content: center;
-            border-radius: 999px; border: 2px solid #fff;
-            background: #fff; color: #B94F9A; font-size: 12px; font-weight: 800;
-            box-shadow: 0 7px 20px rgba(var(--theme-shadow-primary-rgb), .27);
-            cursor: pointer;
-        }
-        .shop-sales-button.admin-visible, .shop-activity-button.admin-visible { display: inline-flex; }
-        .shop-sales-button { right: calc(5% + 92px); }
-        .shop-activity-button { right: calc(5% + 184px); }
-        .shop-sales-button i, .shop-activity-button i { font-size: 14px; }
-        @media (max-width: 430px) {
-            .shop-sales-button, .shop-activity-button { bottom: 92px; padding: 0 9px; font-size: 10px; }
-            .shop-sales-button { right: calc(3% + 82px); }
-            .shop-activity-button { right: calc(3% + 164px); }
-        }
-        @media (max-height: 500px) {
-            .shop-sales-button, .shop-activity-button { bottom: 78px; }
-        }
-        .sales-activity-banner {
-            position: absolute; left: 5%; right: 5%; bottom: 145px; z-index: 112;
-            display: none; align-items: center; gap: 10px; padding: 10px 12px;
-            border: 1px solid #F8C8DC; border-radius: 18px; background: rgba(255,255,255,.96);
-            box-shadow: 0 10px 28px rgba(var(--theme-shadow-primary-rgb), .20);
-            backdrop-filter: blur(12px); cursor: pointer; transform: translateY(18px); opacity: 0;
-        }
-        .sales-activity-banner.show { display: flex; animation: salesBannerIn .35s ease forwards; }
-        .sales-activity-banner.hide { display: flex; animation: salesBannerOut .3s ease forwards; }
-        .sales-activity-avatar { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #FFF0F7; color: #D870B8; }
-        .sales-activity-copy { min-width: 0; flex: 1; }
-        .sales-activity-copy strong { display: block; font-size: 11px; color: #7A6669; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .sales-activity-copy span { display: block; margin-top: 2px; font-size: 10px; color: #9A858B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .sales-activity-close { border: 0; background: transparent; color: #B9A4AA; font-size: 15px; padding: 2px 4px; cursor: pointer; }
-        @keyframes salesBannerIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes salesBannerOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(18px); } }
-        @media (max-height: 500px) { .sales-activity-banner { bottom: 125px; } }
         .shop-add-button {
             position: absolute; right: 5%; bottom: 92px; z-index: 110;
             min-height: 43px; padding: 0 14px;
@@ -1635,23 +1597,6 @@
             </div>
 
             <button type="button" class="shop-add-button" id="shopAddButton" onclick="startAddProduct()" aria-label="เพิ่มสินค้าในระบบแอดมิน"><i class="fas fa-plus-circle"></i><span>เพิ่มสินค้า (แอดมิน)</span></button>
-            <button type="button" class="shop-sales-button" id="shopSalesButton" onclick="openSalesDashboard()" aria-label="ดูยอดขายร้าน"><i class="fas fa-chart-line"></i><span>ยอดขาย</span></button>
-            <button type="button" class="shop-activity-button" id="shopActivityButton" onclick="showNextSalesActivity(true)" aria-label="ดูกิจกรรมล่าสุด"><i class="fas fa-sparkles"></i><span>กิจกรรม</span></button>
-            <div id="salesActivityBanner" class="sales-activity-banner" role="status" aria-live="polite"></div>
-            <div id="salesDashboardModal" class="fixed inset-0 z-[9998] hidden items-center justify-center bg-black/40 p-4">
-                <div class="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl border border-[#F8C8DC] space-y-4">
-                    <div class="flex items-center justify-between gap-3">
-                        <div><h3 class="font-extrabold text-lg text-[#7A6669]">📊 ยอดขายของร้าน</h3><p class="text-[10px] text-[#A38E94]">นับเฉพาะออร์เดอร์ที่ยืนยันชำระเงินแล้ว</p></div>
-                        <button type="button" onclick="closeSalesDashboard()" class="rounded-full bg-[#FFF0F7] px-3 py-1 text-[#D870B8] font-bold">×</button>
-                    </div>
-                    <div id="salesDashboardContent" class="grid grid-cols-2 gap-3"></div>
-                    <div class="rounded-2xl border border-[#F8C8DC] bg-[#FFF9FC] p-3">
-                        <p class="font-bold text-xs text-[#7A6669] mb-2">✨ ออร์เดอร์ล่าสุด</p>
-                        <div id="salesDashboardRecent" class="space-y-2 text-xs"></div>
-                    </div>
-                    <button type="button" onclick="loadSalesDashboard()" class="w-full rounded-xl border border-[#F8C8DC] bg-white py-2 text-xs font-bold text-[#D870B8]">รีเฟรชยอดขาย</button>
-                </div>
-            </div>
             <nav class="shop-bottom-bar" id="shopBottomBar" aria-label="หมวดสินค้า"></nav>
             <div class="home-indicator"></div>
         </div>
@@ -2000,7 +1945,6 @@
                 auth.onAuthStateChanged((user) => {
                     isAdminLoggedIn = !!user && user.uid === ADMIN_UID;
                     updateAdminLockIcon();
-                    updateSalesFloatingButtons();
                     if (document.getElementById('reviewsListContainer')) renderReviewsList();
                     if (document.getElementById('queueListContainer')) renderQueueList();
                     if (document.getElementById('pointsContainer')) renderPoints();
@@ -4408,6 +4352,8 @@
         }
 
         function openProductModal(id = null, category = activeShopTab) {
+            // Open the modal first so an error while preparing product data
+            // can never make the Add Product button appear unresponsive.
             if (!firebaseReady || !db || !auth) {
                 const ready = initializeFirebaseSafely();
                 if (!ready) {
@@ -4416,40 +4362,116 @@
                 }
             }
             if (!isAdminLoggedIn || auth?.currentUser?.uid !== ADMIN_UID) return;
-            const prod = productsData.find(p => p.id === id);
-            document.getElementById('productEditId').value = prod?.id || '';
-            const select = document.getElementById('productCategory');
-            select.replaceChildren();
-            siteConfig.shopCategories.forEach(item => {
-                const option = document.createElement('option'); option.value = item.id;
-                option.textContent = [item.icon,item.title].filter(Boolean).join(' ') || `หมวดสินค้า ${select.children.length + 1}`; select.append(option);
-            });
-            select.value = prod?.category || (shopCategoryById(category) ? category : siteConfig.shopCategories[0]?.id || '');
-            updateProductSubcategoryOptions(prod ? productSubcategoryId(prod, select.value) : (category === activeShopTab ? activeSubcategoryId : null));
-            document.getElementById('productTitle').value = prod?.title || '';
-            document.getElementById('productPrice').value = prod?.price || '';
-            document.getElementById('productPriceBaht').value = prod?.priceBaht || '';
-            document.getElementById('productDeliveryType').value = prod?.deliveryType || 'custom';
-            document.getElementById('productSoldOut').checked = !!prod?.soldOut;
-            productCodeInventoryReady = false;
-            productCodeOriginal = [];
-            renderProductCodeInputs(['']);
-            document.getElementById('productDeliveryFile').value = '';
-            updateDeliveryFields();
-            loadProductDeliveryInfo(prod?.id, ++productCodeLoadVersion);
-            document.getElementById('productDescription').value = prod?.description || '';
-            document.getElementById('productLink').value = prod?.link || '';
-            document.getElementById('productLinkText').value = prod?.linkText || '';
-            document.getElementById('productImage').value = '';
-            productImageData = prod?.image || '';
-            pendingProductLegacyRemoval = false;
-            pendingProductPhotoDeletes = new Set();
-            const preview = document.getElementById('productImagePreview');
-            preview.src = productImageData || '';
-            preview.classList.toggle('hidden', !productImageData);
-            renderProductImagesAdmin(prod);
-            document.getElementById('productModalHeading').textContent = prod ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า';
-            document.getElementById('productModal').classList.add('active');
+
+            const modal = document.getElementById('productModal');
+            if (!modal) {
+                console.error('[Product Modal] ไม่พบ #productModal ในหน้าเว็บ');
+                showToast('ไม่พบหน้าต่างเพิ่มสินค้า กรุณารีเฟรชหน้าเว็บค่ะ', 'fa-times-circle');
+                return;
+            }
+
+            // IMPORTANT: show the popup before any data preparation that may throw.
+            modal.classList.add('active');
+
+            try {
+                const prod = Array.isArray(productsData) ? productsData.find(p => p.id === id) : null;
+                const categories = Array.isArray(siteConfig?.shopCategories) ? siteConfig.shopCategories : [];
+
+                const editId = document.getElementById('productEditId');
+                if (editId) editId.value = prod?.id || '';
+
+                const select = document.getElementById('productCategory');
+                if (select) {
+                    select.replaceChildren();
+                    categories.forEach(item => {
+                        const option = document.createElement('option');
+                        option.value = item.id;
+                        option.textContent = [item.icon, item.title].filter(Boolean).join(' ')
+                            || `หมวดสินค้า ${select.children.length + 1}`;
+                        select.append(option);
+                    });
+
+                    let selectedCategory = prod?.category || '';
+                    if (!selectedCategory && typeof shopCategoryById === 'function' && shopCategoryById(category)) {
+                        selectedCategory = category;
+                    }
+                    if (!selectedCategory) selectedCategory = categories[0]?.id || '';
+                    select.value = selectedCategory;
+
+                    if (typeof updateProductSubcategoryOptions === 'function') {
+                        const selectedSubcategory = prod
+                            ? productSubcategoryId(prod, selectedCategory)
+                            : (category === activeShopTab ? activeSubcategoryId : null);
+                        updateProductSubcategoryOptions(selectedSubcategory);
+                    }
+                }
+
+                const title = document.getElementById('productTitle');
+                if (title) title.value = prod?.title || '';
+
+                const price = document.getElementById('productPrice');
+                if (price) price.value = prod?.price || '';
+
+                const priceBaht = document.getElementById('productPriceBaht');
+                if (priceBaht) priceBaht.value = prod?.priceBaht || '';
+
+                const deliveryType = document.getElementById('productDeliveryType');
+                if (deliveryType) deliveryType.value = prod?.deliveryType || 'custom';
+
+                const soldOut = document.getElementById('productSoldOut');
+                if (soldOut) soldOut.checked = !!prod?.soldOut;
+
+                productCodeInventoryReady = false;
+                productCodeOriginal = [];
+                if (typeof renderProductCodeInputs === 'function') {
+                    renderProductCodeInputs(['']);
+                }
+
+                const deliveryFile = document.getElementById('productDeliveryFile');
+                if (deliveryFile) deliveryFile.value = '';
+
+                if (typeof updateDeliveryFields === 'function') {
+                    updateDeliveryFields();
+                }
+                if (typeof loadProductDeliveryInfo === 'function') {
+                    loadProductDeliveryInfo(prod?.id, ++productCodeLoadVersion);
+                }
+
+                const description = document.getElementById('productDescription');
+                if (description) description.value = prod?.description || '';
+
+                const link = document.getElementById('productLink');
+                if (link) link.value = prod?.link || '';
+
+                const linkText = document.getElementById('productLinkText');
+                if (linkText) linkText.value = prod?.linkText || '';
+
+                const imageInput = document.getElementById('productImage');
+                if (imageInput) imageInput.value = '';
+
+                productImageData = prod?.image || '';
+                pendingProductLegacyRemoval = false;
+                pendingProductPhotoDeletes = new Set();
+
+                const preview = document.getElementById('productImagePreview');
+                if (preview) {
+                    preview.src = productImageData || '';
+                    preview.classList.toggle('hidden', !productImageData);
+                }
+
+                if (typeof renderProductImagesAdmin === 'function') {
+                    renderProductImagesAdmin(prod);
+                }
+
+                const heading = document.getElementById('productModalHeading');
+                if (heading) heading.textContent = prod ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า';
+
+            } catch (error) {
+                // The popup is already visible, so a secondary data error cannot
+                // make the Add Product button appear completely unresponsive.
+                console.error('[Product Modal] เตรียมข้อมูลสินค้าไม่สำเร็จ:', error);
+                showToast('เปิดหน้าต่างสินค้าแล้ว แต่ข้อมูลบางส่วนโหลดไม่สำเร็จค่ะ', 'fa-exclamation-circle');
+            }
         }
 
         function updateProductSubcategoryOptions(selectedId = null) {
@@ -5024,120 +5046,6 @@
                 });
             }
         }
-        let salesActivityItems = [];
-        let salesActivityIndex = 0;
-        let salesActivityTimer = null;
-        let salesActivityHideTimer = null;
-
-        function formatActivityAge(ms) {
-            const seconds = Math.max(0, Math.floor(ms / 1000));
-            if (seconds < 60) return 'เมื่อสักครู่นี้';
-            const minutes = Math.floor(seconds / 60);
-            if (minutes < 60) return `เมื่อ ${minutes} นาทีที่แล้ว`;
-            const hours = Math.floor(minutes / 60);
-            if (hours < 24) return `เมื่อ ${hours} ชั่วโมงที่แล้ว`;
-            return `เมื่อ ${Math.floor(hours / 24)} วันที่แล้ว`;
-        }
-
-        function renderSalesActivityBanner(item) {
-            const banner = document.getElementById('salesActivityBanner');
-            if (!banner || !item) return;
-            banner.classList.remove('show', 'hide');
-            void banner.offsetWidth;
-            const age = item.createdAtMillis ? formatActivityAge(Date.now() - item.createdAtMillis) : 'เมื่อสักครู่นี้';
-            banner.innerHTML = `<div class="sales-activity-avatar"><i class="fas fa-shopping-bag"></i></div><div class="sales-activity-copy"><strong>🎀 ${escapeHtml(item.maskedName || 'ลูกค้า')} สั่งซื้อ ${escapeHtml(item.title || 'สินค้า')} แล้ว</strong><span>${escapeHtml(age)} • ขอบคุณที่อุดหนุน Pufforia 💕</span></div><button type="button" class="sales-activity-close" aria-label="ปิด">×</button>`;
-            banner.querySelector('.sales-activity-close').onclick = event => { event.stopPropagation(); hideSalesActivityBanner(); };
-            banner.onclick = hideSalesActivityBanner;
-            banner.classList.add('show');
-            clearTimeout(salesActivityHideTimer);
-            salesActivityHideTimer = setTimeout(hideSalesActivityBanner, 5200);
-        }
-
-        function hideSalesActivityBanner() {
-            const banner = document.getElementById('salesActivityBanner');
-            if (!banner || !banner.classList.contains('show')) return;
-            banner.classList.remove('show');
-            banner.classList.add('hide');
-            setTimeout(() => banner.classList.remove('hide'), 320);
-        }
-
-        function showNextSalesActivity(manual = false) {
-            if (!salesActivityItems.length) {
-                if (manual) showToast('ยังไม่มีกิจกรรมการสั่งซื้อที่ยืนยันแล้วค่ะ');
-                return;
-            }
-            const item = salesActivityItems[salesActivityIndex % salesActivityItems.length];
-            salesActivityIndex = (salesActivityIndex + 1) % salesActivityItems.length;
-            renderSalesActivityBanner(item);
-        }
-
-        async function loadSalesActivity() {
-            try {
-                const response = await fetch('/api/order', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({action: 'recent-sales'})
-                });
-                const data = await response.json().catch(() => ({}));
-                if (!response.ok || !data.ok) throw new Error(data.error || 'โหลดกิจกรรมไม่สำเร็จ');
-                salesActivityItems = Array.isArray(data.recent) ? data.recent : [];
-                clearInterval(salesActivityTimer);
-                if (salesActivityItems.length) {
-                    salesActivityTimer = setInterval(() => showNextSalesActivity(false), 12000);
-                    setTimeout(() => showNextSalesActivity(false), 3500);
-                }
-            } catch (error) {
-                console.warn('Sales activity unavailable:', error);
-            }
-        }
-
-        async function loadSalesDashboard() {
-            const content = document.getElementById('salesDashboardContent');
-            const recent = document.getElementById('salesDashboardRecent');
-            if (!content || !recent) return;
-            content.innerHTML = '<div class="col-span-2 text-center text-xs text-[#A38E94] py-4">กำลังโหลดข้อมูลยอดขาย...</div>';
-            recent.innerHTML = '';
-            try {
-                const response = await fetch('/api/order', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({action: 'recent-sales'})
-                });
-                const data = await response.json().catch(() => ({}));
-                if (!response.ok || !data.ok) throw new Error(data.error || 'โหลดยอดขายไม่สำเร็จ');
-                const stats = data.stats || {};
-                content.innerHTML = `<div class="rounded-2xl bg-[#FFF0F7] p-3"><p class="text-[10px] text-[#9A858B]">จำหน่ายแล้ว</p><p class="text-xl font-extrabold text-[#D870B8]">${Number(stats.soldItems || 0).toLocaleString()} ชิ้น</p></div><div class="rounded-2xl bg-[#EEF9FF] p-3"><p class="text-[10px] text-[#7C929D]">ยอดขายรวม</p><p class="text-xl font-extrabold text-[#397CA5]">฿${(Number(stats.totalCents || 0) / 100).toLocaleString('th-TH',{minimumFractionDigits:2})}</p></div><div class="rounded-2xl bg-[#FFF9EC] p-3"><p class="text-[10px] text-[#9A858B]">ออร์เดอร์ที่ชำระแล้ว</p><p class="text-xl font-extrabold text-[#8B6F31]">${Number(stats.paidOrders || 0).toLocaleString()}</p></div><div class="rounded-2xl bg-[#F5F3FF] p-3"><p class="text-[10px] text-[#8F879D]">สถานะ</p><p class="text-sm font-extrabold text-[#756D86]">อัปเดตล่าสุด</p></div>`;
-                const recentItems = Array.isArray(data.recent) ? data.recent.slice(0, 5) : [];
-                recent.innerHTML = recentItems.length
-                    ? recentItems.map(item => `<div class="flex items-center justify-between gap-2 border-b border-[#F8C8DC] pb-2"><span class="min-w-0 truncate"><b>${escapeHtml(item.maskedName || 'ลูกค้า')}</b> สั่ง ${escapeHtml(item.title || 'สินค้า')} × ${Number(item.qty || 0)}</span><span class="shrink-0 font-bold text-[#D870B8]">฿${(Number(item.totalCents || 0) / 100).toLocaleString('th-TH',{minimumFractionDigits:2})}</span></div>`).join('')
-                    : '<p class="text-[#A38E94]">ยังไม่มีออร์เดอร์ที่ยืนยันชำระเงินค่ะ</p>';
-            } catch (error) {
-                content.innerHTML = `<div class="col-span-2 text-center text-xs text-rose-500 py-4">${escapeHtml(error.message || 'โหลดข้อมูลไม่สำเร็จค่ะ')}</div>`;
-            }
-        }
-
-        function openSalesDashboard() {
-            if (!isAdminLoggedIn) return;
-            const modal = document.getElementById('salesDashboardModal');
-            if (!modal) return;
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            loadSalesDashboard();
-        }
-
-        function closeSalesDashboard() {
-            const modal = document.getElementById('salesDashboardModal');
-            if (!modal) return;
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
-
-        function updateSalesFloatingButtons() {
-            const show = !!isAdminLoggedIn;
-            document.getElementById('shopSalesButton')?.classList.toggle('admin-visible', show);
-            document.getElementById('shopActivityButton')?.classList.toggle('admin-visible', show);
-        }
-
         async function refreshAdminOrders() {
             if(auth?.currentUser?.uid!==ADMIN_UID)return;
             try {
@@ -5345,7 +5253,6 @@
                 }
 
                 await loadSiteConfigFromFirestore();
-                loadSalesActivity();
 
                 updateDataLoadingText('กำลังโหลดข้อมูล...');
                 initFirebaseReviews();
