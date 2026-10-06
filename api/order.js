@@ -450,13 +450,21 @@ async function listInstallmentsForUid(uid) {
     .limit(100)
     .get();
 
-  return snap.docs
-    .map(d => normalizeInstallmentDoc(d.id, d.data() || {}))
-    .sort((a, b) => {
-      const aa = a.createdAt?.seconds || 0;
-      const bb = b.createdAt?.seconds || 0;
-      return bb - aa;
-    });
+  const rows = await Promise.all(snap.docs.map(async d => {
+    const installment = normalizeInstallmentDoc(d.id, d.data() || {});
+    let order = null;
+    if (installment.orderToken) {
+      const orderSnap = await db().collection('orders_cakee').doc(String(installment.orderToken)).get();
+      if (orderSnap.exists) order = { id: orderSnap.id, ...orderSnap.data() };
+    }
+    return order ? { ...installment, orderToken: order.id, orderNo: order.orderNo, items: order.items || [], totalCents: Number(order.totalCents || installment.totalCents || 0), status: order.status, orderStatus: order.status, installment: { ...(order.installment || {}), ...installment } } : installment;
+  }));
+
+  return rows.sort((a, b) => {
+    const aa = a.createdAt?.seconds || 0;
+    const bb = b.createdAt?.seconds || 0;
+    return bb - aa;
+  });
 }
 
 async function submitInstallmentSlip(body) {
@@ -626,12 +634,22 @@ async function submitInstallmentSlip(body) {
       if (orderSnap.exists) {
         const orderData = orderSnap.data() || {};
         const oldInst = orderData.installment || {};
-        const newSchedule = Array.isArray(oldInst.schedule) ? oldInst.schedule : [];
         tx.update(orderRef, {
           installment: { ...oldInst, paidCents:newPaidCents, remainingCents:newRemaining, paidInstallments:newPaidInstallments, currentInstallment:completed ? currentSummary.installmentCount : currentNo+1, progress:currentSummary.totalCents>0 ? Math.min(100, Math.round((newPaidCents/currentSummary.totalCents)*10000)/100) : 100 },
-          status: completed ? 'paid' : 'installment_active',
+          status: completed ? 'submitted' : 'installment_active',
           updatedAt: FieldValue.serverTimestamp()
         });
+        if (completed) {
+          tx.set(db().collection('order_slips_cakee').doc(String(current.orderToken)), {
+            image,
+            imageHost: 'base64',
+            submittedAt: verifiedAt,
+            verificationStatus: 'verified',
+            verificationCode: '',
+            verificationMessage: result.message || 'EasySlip verified installment payment',
+            easySlipData: data
+          }, {merge:true});
+        }
       }
     }
   });
