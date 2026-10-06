@@ -3420,10 +3420,35 @@
         function renderCustomerInstallmentOrderCard(order){
             const inst=order.installment||order, schedule=Array.isArray(inst.schedule)?inst.schedule:[], total=Number(order.totalCents||inst.totalCents||0), paid=Number(inst.paidCents||0), remaining=Math.max(0,total-paid), pct=total?Math.min(100,paid/total*100):0, current=Number(inst.currentInstallment||1), currentRow=schedule.find(x=>Number(x.number)===current), status=order.status==='paid'||inst.status==='completed'?'ชำระครบแล้ว':(order.status==='installment_active'||inst.status==='active'?'กำลังผ่อน':order.status||'กำลังผ่อน'), orderNo=order.orderNo||order.orderNumber||('-'+String(inst.orderToken||'').slice(0,8).toUpperCase());
             const itemsText=(order.items||[]).map(x=>`${x.title} × ${x.qty}`).join(', ') || inst.product || 'รายการผ่อนสินค้า';
-            const token=order.id||inst.orderToken||'';
-            return `<div class="tracking-card"><div class="flex justify-between gap-2"><div><div class="text-[10px] opacity-60">ออเดอร์</div><div class="font-extrabold text-sm">${escapeHtml(orderNo)}</div></div><span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#FFF5FB] text-[#D870B8] border border-[#F8C8DC]">${escapeHtml(status)}</span></div><div class="text-xs mt-2">${escapeHtml(itemsText)}</div><div class="grid grid-cols-3 gap-2 mt-3 text-center"><div class="bg-[var(--theme-soft)] rounded-xl p-2"><div class="text-[9px] opacity-60">ยอดเต็ม</div><b class="text-xs">${money(total)}</b></div><div class="bg-[var(--theme-soft)] rounded-xl p-2"><div class="text-[9px] opacity-60">จ่ายแล้ว</div><b class="text-xs">${money(paid)}</b></div><div class="bg-[var(--theme-soft)] rounded-xl p-2"><div class="text-[9px] opacity-60">คงเหลือ</div><b class="text-xs">${money(remaining)}</b></div></div><div class="flex justify-between text-[10px] mt-3 mb-1"><span>ความคืบหน้า</span><b>${Math.round(pct)}%</b></div><div class="tracking-progress"><div style="width:${pct}%"></div></div><div class="mt-3 text-[10px]">งวดที่ ${current} / ${schedule.length||inst.installmentCount||inst.plan?.installments||'-'}${currentRow?` · งวดนี้ ${money(Number(currentRow.amountCents)||0)}`:''}</div><button type="button" onclick="openOrderByToken('${escapeHtml(String(token))}')" class="w-full mt-3 bg-[#FFF5FB] text-[#D870B8] border border-[#F8C8DC] rounded-xl py-2 text-xs font-bold">ดูรายละเอียด / ชำระงวด</button></div>`;
+            const installmentId=String(inst.installmentId||inst.id||order.installmentId||'');
+            const token=order.id||inst.orderToken||inst.orderId||'';
+            const action=installmentId?`openInstallmentDetail('${escapeHtml(installmentId)}')`:(token?`openOrderByToken('${escapeHtml(String(token))}')`:`showToast('รายการผ่อนนี้ยังไม่มีรหัสออเดอร์ค่ะ')`);
+            return `<div class="tracking-card"><div class="flex justify-between gap-2"><div><div class="text-[10px] opacity-60">ออเดอร์ / รายการผ่อน</div><div class="font-extrabold text-sm">${escapeHtml(orderNo)}</div></div><span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#FFF5FB] text-[#D870B8] border border-[#F8C8DC]">${escapeHtml(status)}</span></div><div class="text-xs mt-2">${escapeHtml(itemsText)}</div><div class="grid grid-cols-3 gap-2 mt-3 text-center"><div class="bg-[var(--theme-soft)] rounded-xl p-2"><div class="text-[9px] opacity-60">ยอดเต็ม</div><b class="text-xs">${money(total)}</b></div><div class="bg-[var(--theme-soft)] rounded-xl p-2"><div class="text-[9px] opacity-60">จ่ายแล้ว</div><b class="text-xs">${money(paid)}</b></div><div class="bg-[var(--theme-soft)] rounded-xl p-2"><div class="text-[9px] opacity-60">คงเหลือ</div><b class="text-xs">${money(remaining)}</b></div></div><div class="flex justify-between text-[10px] mt-3 mb-1"><span>ความคืบหน้า</span><b>${Math.round(pct)}%</b></div><div class="tracking-progress"><div style="width:${pct}%"></div></div><div class="mt-3 text-[10px]">งวดที่ ${current} / ${schedule.length||inst.installmentCount||inst.plan?.installments||'-'}${currentRow?` · งวดนี้ ${money(Number(currentRow.amountCents)||0)}`:''}</div><button type="button" onclick="${action}" class="w-full mt-3 bg-[#FFF5FB] text-[#D870B8] border border-[#F8C8DC] rounded-xl py-2 text-xs font-bold">ดูรายละเอียด / ชำระงวด</button></div>`;
         }
         async function openOrderByToken(token){const value=String(token||'').trim().toLowerCase();if(!/^[a-f0-9]{48}$/.test(value))return showToast('ไม่พบรหัสออร์เดอร์สำหรับรายการผ่อนนี้ค่ะ');document.getElementById('lookupOrderNo').value='AM-'+value.slice(0,8).toUpperCase();document.getElementById('lookupAccessCode').value=value.slice(8).toUpperCase();openOrderLookup();await lookupGuestOrder();}
+        async function openInstallmentDetail(installmentId){
+            if(!auth?.currentUser)return openCustomerAuthModal('login');
+            const id=String(installmentId||'').trim(); if(!id)return showToast('ไม่พบรหัสรายการผ่อนค่ะ','fa-times-circle');
+            try{
+                const token=await auth.currentUser.getIdToken(true);
+                const response=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({action:'installment-detail',installmentId:id})});
+                const data=await response.json().catch(()=>({}));
+                if(!response.ok||!data.ok)throw new Error(data.error||'ไม่สามารถเปิดรายละเอียดรายการผ่อนได้ค่ะ');
+                window.__currentInstallmentId=id;
+                if(data.order?.id){
+                    document.getElementById('lookupOrderNo').value=data.order.orderNo||('AM-'+String(data.order.id).slice(0,8).toUpperCase());
+                    document.getElementById('lookupAccessCode').value=String(data.order.id).slice(8).toUpperCase();
+                    openOrderLookup();
+                    await lookupGuestOrder();
+                    return;
+                }
+                let modal=document.getElementById('customerInstallmentDetailModal');
+                if(!modal){modal=document.createElement('div');modal.id='customerInstallmentDetailModal';modal.className='modal-overlay';document.body.appendChild(modal);}
+                const inst=data.installment||{};const schedule=Array.isArray(inst.schedule)?inst.schedule:[];const total=Number(inst.totalCents||0),paid=Number(inst.paidCents||0),remaining=Math.max(0,total-paid);
+                modal.innerHTML=`<div class="modal-content"><div class="flex justify-between items-center mb-3"><h3 class="font-bold text-sm">♡ รายละเอียดรายการผ่อน</h3><button type="button" onclick="document.getElementById('customerInstallmentDetailModal').classList.remove('active')" class="text-lg">✕</button></div><div class="tracking-card"><b>${escapeHtml(inst.product||inst.productName||'รายการผ่อนสินค้า')}</b><div class="text-xs mt-2">ยอดทั้งหมด ${money(total)}</div><div class="text-xs">ชำระแล้ว ${money(paid)}</div><div class="text-xs">คงเหลือ ${money(remaining)}</div><div class="tracking-progress mt-3"><div style="width:${total?Math.min(100,paid/total*100):0}%"></div></div></div><div class="space-y-2">${schedule.map(row=>`<div class="border border-[var(--theme-border)] rounded-xl p-3 text-xs flex justify-between"><span>งวดที่ ${escapeHtml(row.number||'-')}<br><small class="opacity-60">${escapeHtml(row.dueAt||row.dueDate||'-')}</small></span><b>${money(Number(row.amountCents)||0)}</b></div>`).join('')||'<div class="text-xs opacity-60 text-center">ยังไม่มีตารางงวด</div>'}</div></div>`;
+                modal.classList.add('active');
+            }catch(e){console.error(e);showToast(e.message||'เปิดรายละเอียดรายการผ่อนไม่สำเร็จค่ะ','fa-times-circle');}
+        }
         async function openInstallmentAdminModal(id=''){if(!isAdminLoggedIn||auth?.currentUser?.uid!==ADMIN_UID)return showToast('กรุณาเข้าสู่ระบบแอดมินก่อนค่ะ');document.getElementById('installmentAdminModal').classList.add('active');await loadInstallmentAdminData();if(id==='new'){resetInstallmentForm();showInstallmentAdminForm();return;}if(id){resetInstallmentForm();document.getElementById('installmentEditId').value=id;const x=installmentData.find(v=>v.id===id);if(x)fillInstallmentForm(x);showInstallmentAdminForm();}}
         function resetInstallmentForm(){document.getElementById('installmentModalTitle').innerHTML='<i class="fas fa-wallet text-[#D870B8] mr-1"></i> เพิ่มรายการผ่อนสินค้า';['installmentEditId','installmentNameInput','installmentPhone4Input','installmentOrderInput','installmentProductInput','installmentTotalInput','installmentPaidInput','installmentNoInput','installmentTotalNoInput','installmentDueDateInput','installmentNoteInput'].forEach(id=>document.getElementById(id).value='');document.getElementById('installmentStatusInput').value='กำลังผ่อน';}
         function fillInstallmentForm(x){document.getElementById('installmentModalTitle').innerHTML='<i class="fas fa-edit text-[#D870B8] mr-1"></i> แก้ไขรายการผ่อนสินค้า';document.getElementById('installmentNameInput').value=x.name||'';document.getElementById('installmentPhone4Input').value=x.phone4||'';document.getElementById('installmentOrderInput').value=x.orderNo||'';document.getElementById('installmentProductInput').value=x.product||'';document.getElementById('installmentTotalInput').value=x.total??'';document.getElementById('installmentPaidInput').value=x.paid??'';document.getElementById('installmentNoInput').value=x.installmentNo??'';document.getElementById('installmentTotalNoInput').value=x.totalInstallments??'';document.getElementById('installmentDueDateInput').value=x.nextDueDate||'';document.getElementById('installmentStatusInput').value=x.statusLabel||x.status||'กำลังผ่อน';document.getElementById('installmentNoteInput').value=x.note||'';}
@@ -3938,7 +3963,21 @@
                 box.innerHTML=d.orders.map(o=>{const items=(o.items||[]).map(x=>`${escapeHtml(x.title||'สินค้า')} × ${x.qty}`).join('<br>');const status=o.status==='paid'?'ชำระแล้ว':o.status==='installment_active'?'กำลังผ่อน':o.status==='completed'?'เสร็จสิ้น':o.status||'รอดำเนินการ';return `<div class="tracking-card mb-2"><div class="flex justify-between gap-2"><b class="text-xs">${escapeHtml(o.orderNo||'-')}</b><span class="text-[9px] px-2 py-1 rounded-full bg-[#FFF5FB] text-[#D870B8]">${escapeHtml(status)}</span></div><div class="text-[10px] mt-2">${items||'-'}</div><div class="text-xs font-bold mt-2">${money(Number(o.totalCents||0))}</div></div>`;}).join('');
             }catch(e){box.innerHTML='<div class="tracking-card text-center text-xs text-rose-500">'+escapeHtml(e.message||'เกิดข้อผิดพลาดค่ะ')+'</div>';}
         }
-        function openAccountInstallments(){closeAccountModal();openCheckQSubpage('installment');}
+        function openAccountInstallments(){
+            if(!auth?.currentUser){
+                closeAccountModal();
+                openCustomerAuthModal('login');
+                return;
+            }
+            closeAccountModal();
+            const checkCategory=categories.find(category=>category.id==='checkq');
+            if(!checkCategory){
+                showToast('ไม่พบหน้าสำหรับเช็คยอดผ่อนค่ะ','fa-exclamation-circle');
+                return;
+            }
+            openCategory(checkCategory);
+            setTimeout(()=>openCheckQSubpage('installment'),30);
+        }
 
         function openAdminLoginModal() {
             document.getElementById('adminPasswordInput').value = '';
