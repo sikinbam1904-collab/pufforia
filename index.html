@@ -700,7 +700,6 @@
         /* ทุกปุ่มและแท็บของหลังบ้านใช้ตัวแปรธีมเดียวกับหน้าเว็บ */
         /* ===== Check Queue / Shipping / Installment ===== */
         .checkq-choice-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:14px}
-        .product-installment-box{border:1px solid var(--theme-border);background:var(--theme-soft);border-radius:18px;padding:10px;margin-top:4px}.installment-plan-row{display:grid;grid-template-columns:1fr 70px 28px;align-items:center;gap:6px;font-size:11px}.installment-plan-row label{display:flex;align-items:center;gap:6px;font-weight:700}.installment-plan-row select{padding:7px 6px!important}.checkout-payment-box{border:1px solid var(--theme-border);background:var(--theme-surface);border-radius:18px;padding:12px}.payment-choice{display:flex;align-items:center;gap:8px;border:1px solid var(--theme-border);border-radius:14px;padding:10px 11px;margin-top:7px;font-size:12px;font-weight:700}.payment-choice b{margin-left:auto;color:var(--theme-primary)}.member-installment-card{border:1px solid var(--theme-border);background:var(--theme-surface);border-radius:20px;padding:13px}.member-progress{height:8px;border-radius:99px;background:var(--theme-soft);overflow:hidden}.member-progress>div{height:100%;background:var(--theme-primary);border-radius:99px}.member-schedule-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 0;border-bottom:1px solid var(--theme-border);font-size:10px}.member-schedule-row:last-child{border-bottom:0}
         .checkq-choice{position:relative;width:100%;min-height:82px;display:flex;align-items:center;gap:16px;border:1px solid var(--theme-border);background:var(--theme-surface);border-radius:22px;padding:13px 18px;text-align:left;color:var(--theme-text);transition:.2s;box-shadow:0 4px 14px rgba(0,0,0,.04)}
         .checkq-choice:active{transform:scale(.985)}
         .checkq-choice .choice-icon{width:56px;height:56px;flex:0 0 56px;border-radius:19px;display:flex;align-items:center;justify-content:center;margin:0;background:var(--theme-soft);color:var(--theme-primary);font-size:20px}
@@ -1153,31 +1152,32 @@
     <div class="modal-overlay" id="shippingAdminModal">
         <div class="modal-content">
             <div class="flex justify-between items-center mb-3">
-                <h3 class="text-sm font-bold" id="shippingModalTitle"><i class="fas fa-box text-[#D870B8] mr-1"></i> เพิ่มรายการจัดส่ง</h3>
+                <h3 class="text-sm font-bold"><i class="fas fa-box text-[#D870B8] mr-1"></i> จัดการพัสดุ</h3>
                 <button onclick="closeShippingAdminModal()" class="w-7 h-7 rounded-full bg-[#FFF5FB] text-[#D870B8] flex items-center justify-center text-xs font-bold border border-[#F8C8DC]"><i class="fas fa-times"></i></button>
             </div>
-            <input type="hidden" id="shippingEditId">
-            <div class="space-y-2 text-left">
-                <label class="admin-label">ชื่อลูกค้า:<input id="shippingNameInput" class="admin-input" placeholder="ชื่อ - นามสกุล"></label>
-                <label class="admin-label">เบอร์โทรศัพท์ 4 ตัวท้าย:<input id="shippingPhone4Input" class="admin-input" inputmode="numeric" maxlength="4" placeholder="1234"></label>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="admin-label">บริษัทขนส่ง:<input id="shippingCarrierInput" class="admin-input" placeholder="เช่น Flash / J&T"></label>
-                    <label class="admin-label">เลขพัสดุ:<input id="shippingTrackingInput" class="admin-input" placeholder="TH123456789"></label>
-                </div>
-                <label class="admin-label">รายละเอียดเพิ่มเติม:<textarea id="shippingDetailInput" rows="2" class="admin-input" placeholder="รายละเอียดพัสดุ / หมายเหตุ"></textarea></label>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="admin-label">วันที่จัดส่ง:<input type="date" id="shippingOrderDateInput" class="admin-input"></label>
-                    <label class="admin-label">วันที่คาดว่าจะถึง:<input type="date" id="shippingDueDateInput" class="admin-input"></label>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="admin-label">สถานะ:<select id="shippingStatusInput" class="admin-input"></select></label>
-                    <label class="admin-label">ความคืบหน้า (%):<input type="number" id="shippingProgressInput" class="admin-input" min="0" max="100" value="0"></label>
-                </div>
-                <label class="admin-label">รายละเอียดเหตุการณ์ล่าสุด:<input id="shippingEventDetailInput" class="admin-input" placeholder="เช่น พัสดุถึงสาขาปลายทางแล้ว"></label>
+            <div class="grid grid-cols-2 gap-2 mb-3">
+                <div class="bg-[var(--theme-soft)] rounded-2xl p-3 text-center"><div class="text-[10px] opacity-60">พัสดุทั้งหมด</div><b id="shippingAdminCount" class="text-lg">0</b></div>
+                <div class="bg-[var(--theme-soft)] rounded-2xl p-3 text-center"><div class="text-[10px] opacity-60">กำลังจัดส่ง</div><b id="shippingAdminActive" class="text-lg">0</b></div>
             </div>
-            <button onclick="saveShippingData()" class="w-full bg-[#D870B8] text-white font-bold py-3 rounded-xl text-sm mt-4">บันทึกรายการจัดส่ง</button>
-            <div class="mt-5 flex items-center justify-between"><strong class="text-xs">รายการพัสดุทั้งหมด</strong><button onclick="loadShippingAdminData()" class="text-xs text-[#D870B8]">รีเฟรช</button></div>
-            <div id="shippingAdminList" class="admin-mini-table mt-2"></div>
+            <div class="flex gap-2 mb-3">
+                <input id="shippingAdminSearch" oninput="renderShippingAdminList()" class="admin-input flex-1" placeholder="ค้นหาชื่อลูกค้า / เลขพัสดุ">
+                <button onclick="openShippingAdminModal('new')" class="shrink-0 bg-[#D870B8] text-white rounded-xl px-3 text-xs font-bold">+ เพิ่ม</button>
+            </div>
+            <div id="shippingAdminList" class="admin-mini-table"></div>
+            <div id="shippingAdminForm" class="hidden mt-4 border-t border-[#F3E3EA] pt-4">
+                <div class="flex justify-between items-center mb-3"><strong id="shippingModalTitle" class="text-xs">เพิ่มรายการจัดส่ง</strong><button onclick="hideShippingAdminForm()" class="text-[10px] text-[#D870B8]">กลับรายการ</button></div>
+                <input type="hidden" id="shippingEditId">
+                <div class="space-y-2 text-left">
+                    <label class="admin-label">ชื่อลูกค้า:<input id="shippingNameInput" class="admin-input" placeholder="ชื่อ - นามสกุล"></label>
+                    <label class="admin-label">เบอร์โทรศัพท์ 4 ตัวท้าย:<input id="shippingPhone4Input" class="admin-input" inputmode="numeric" maxlength="4" placeholder="1234"></label>
+                    <div class="grid grid-cols-2 gap-2"><label class="admin-label">บริษัทขนส่ง:<input id="shippingCarrierInput" class="admin-input" placeholder="เช่น Flash / J&T"></label><label class="admin-label">เลขพัสดุ:<input id="shippingTrackingInput" class="admin-input" placeholder="TH123456789"></label></div>
+                    <label class="admin-label">รายละเอียดเพิ่มเติม:<textarea id="shippingDetailInput" rows="2" class="admin-input" placeholder="รายละเอียดพัสดุ / หมายเหตุ"></textarea></label>
+                    <div class="grid grid-cols-2 gap-2"><label class="admin-label">วันที่จัดส่ง:<input type="date" id="shippingOrderDateInput" class="admin-input"></label><label class="admin-label">วันที่คาดว่าจะถึง:<input type="date" id="shippingDueDateInput" class="admin-input"></label></div>
+                    <div class="grid grid-cols-2 gap-2"><label class="admin-label">สถานะ:<select id="shippingStatusInput" class="admin-input"></select></label><label class="admin-label">ความคืบหน้า (%):<input type="number" id="shippingProgressInput" class="admin-input" min="0" max="100" value="0"></label></div>
+                    <label class="admin-label">รายละเอียดเหตุการณ์ล่าสุด:<input id="shippingEventDetailInput" class="admin-input" placeholder="เช่น พัสดุถึงสาขาปลายทางแล้ว"></label>
+                </div>
+                <button onclick="saveShippingData()" class="w-full bg-[#D870B8] text-white font-bold py-3 rounded-xl text-sm mt-4">บันทึกรายการจัดส่ง</button>
+            </div>
         </div>
     </div>
 
@@ -1185,32 +1185,34 @@
     <div class="modal-overlay" id="installmentAdminModal">
         <div class="modal-content">
             <div class="flex justify-between items-center mb-3">
-                <h3 class="text-sm font-bold" id="installmentModalTitle"><i class="fas fa-wallet text-[#D870B8] mr-1"></i> เพิ่มรายการผ่อนสินค้า</h3>
+                <h3 class="text-sm font-bold"><i class="fas fa-wallet text-[#D870B8] mr-1"></i> จัดการยอดผ่อนลูกค้า</h3>
                 <button onclick="closeInstallmentAdminModal()" class="w-7 h-7 rounded-full bg-[#FFF5FB] text-[#D870B8] flex items-center justify-center text-xs font-bold border border-[#F8C8DC]"><i class="fas fa-times"></i></button>
             </div>
-            <input type="hidden" id="installmentEditId">
-            <div class="space-y-2 text-left">
-                <label class="admin-label">ชื่อลูกค้า:<input id="installmentNameInput" class="admin-input" placeholder="ชื่อ - นามสกุล"></label>
-                <label class="admin-label">เบอร์โทรศัพท์ 4 ตัวท้าย:<input id="installmentPhone4Input" class="admin-input" inputmode="numeric" maxlength="4" placeholder="1234"></label>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="admin-label">เลขออเดอร์:<input id="installmentOrderInput" class="admin-input" placeholder="ORD-001"></label>
-                    <label class="admin-label">งวดที่:<input id="installmentNoInput" type="number" min="1" class="admin-input" placeholder="1"></label>
-                </div>
-                <label class="admin-label">รายการสินค้า:<input id="installmentProductInput" class="admin-input" placeholder="ชื่อสินค้า"></label>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="admin-label">ยอดทั้งหมด (บาท):<input id="installmentTotalInput" type="number" min="0" step="0.01" class="admin-input"></label>
-                    <label class="admin-label">ชำระแล้ว (บาท):<input id="installmentPaidInput" type="number" min="0" step="0.01" class="admin-input"></label>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="admin-label">จำนวนงวดทั้งหมด:<input id="installmentTotalNoInput" type="number" min="1" class="admin-input"></label>
-                    <label class="admin-label">วันนัดงวดถัดไป:<input id="installmentDueDateInput" type="date" class="admin-input"></label>
-                </div>
-                <label class="admin-label">สถานะ:<select id="installmentStatusInput" class="admin-input"><option value="กำลังผ่อน">กำลังผ่อน</option><option value="ชำระครบแล้ว">ชำระครบแล้ว</option><option value="ค้างชำระ">ค้างชำระ</option><option value="ยกเลิก">ยกเลิก</option></select></label>
-                <label class="admin-label">หมายเหตุ:<textarea id="installmentNoteInput" rows="2" class="admin-input"></textarea></label>
+            <div class="grid grid-cols-3 gap-2 mb-3">
+                <div class="bg-[var(--theme-soft)] rounded-2xl p-2.5 text-center"><div class="text-[9px] opacity-60">ลูกค้าทั้งหมด</div><b id="installmentAdminCount" class="text-base">0</b></div>
+                <div class="bg-[var(--theme-soft)] rounded-2xl p-2.5 text-center"><div class="text-[9px] opacity-60">กำลังผ่อน</div><b id="installmentAdminActive" class="text-base">0</b></div>
+                <div class="bg-[var(--theme-soft)] rounded-2xl p-2.5 text-center"><div class="text-[9px] opacity-60">คงเหลือรวม</div><b id="installmentAdminRemaining" class="text-base">฿0</b></div>
             </div>
-            <button onclick="saveInstallmentData()" class="w-full bg-[#D870B8] text-white font-bold py-3 rounded-xl text-sm mt-4">บันทึกรายการผ่อน</button>
-            <div class="mt-5 flex items-center justify-between"><strong class="text-xs">รายการผ่อนทั้งหมด</strong><button onclick="loadInstallmentAdminData()" class="text-xs text-[#D870B8]">รีเฟรช</button></div>
-            <div id="installmentAdminList" class="admin-mini-table mt-2"></div>
+            <div class="flex gap-2 mb-3">
+                <input id="installmentAdminSearch" oninput="renderInstallmentAdminList()" class="admin-input flex-1" placeholder="ค้นหาชื่อลูกค้า / ออเดอร์ / สินค้า">
+                <button onclick="openInstallmentAdminModal('new')" class="shrink-0 bg-[#D870B8] text-white rounded-xl px-3 text-xs font-bold">+ เพิ่ม</button>
+            </div>
+            <div id="installmentAdminList" class="admin-mini-table"></div>
+            <div id="installmentAdminForm" class="hidden mt-4 border-t border-[#F3E3EA] pt-4">
+                <div class="flex justify-between items-center mb-3"><strong id="installmentModalTitle" class="text-xs">เพิ่มรายการผ่อนสินค้า</strong><button onclick="hideInstallmentAdminForm()" class="text-[10px] text-[#D870B8]">กลับรายการ</button></div>
+                <input type="hidden" id="installmentEditId">
+                <div class="space-y-2 text-left">
+                    <label class="admin-label">ชื่อลูกค้า:<input id="installmentNameInput" class="admin-input" placeholder="ชื่อ - นามสกุล"></label>
+                    <label class="admin-label">เบอร์โทรศัพท์ 4 ตัวท้าย:<input id="installmentPhone4Input" class="admin-input" inputmode="numeric" maxlength="4" placeholder="1234"></label>
+                    <div class="grid grid-cols-2 gap-2"><label class="admin-label">เลขออเดอร์:<input id="installmentOrderInput" class="admin-input" placeholder="ORD-001"></label><label class="admin-label">งวดที่:<input id="installmentNoInput" type="number" min="1" class="admin-input" placeholder="1"></label></div>
+                    <label class="admin-label">รายการสินค้า:<input id="installmentProductInput" class="admin-input" placeholder="ชื่อสินค้า"></label>
+                    <div class="grid grid-cols-2 gap-2"><label class="admin-label">ยอดทั้งหมด (บาท):<input id="installmentTotalInput" type="number" min="0" step="0.01" class="admin-input"></label><label class="admin-label">ชำระแล้ว (บาท):<input id="installmentPaidInput" type="number" min="0" step="0.01" class="admin-input"></label></div>
+                    <div class="grid grid-cols-2 gap-2"><label class="admin-label">จำนวนงวดทั้งหมด:<input id="installmentTotalNoInput" type="number" min="1" class="admin-input"></label><label class="admin-label">วันนัดงวดถัดไป:<input id="installmentDueDateInput" type="date" class="admin-input"></label></div>
+                    <label class="admin-label">สถานะ:<select id="installmentStatusInput" class="admin-input"><option value="กำลังผ่อน">กำลังผ่อน</option><option value="ชำระครบแล้ว">ชำระครบแล้ว</option><option value="ค้างชำระ">ค้างชำระ</option><option value="ยกเลิก">ยกเลิก</option></select></label>
+                    <label class="admin-label">หมายเหตุ:<textarea id="installmentNoteInput" rows="2" class="admin-input"></textarea></label>
+                </div>
+                <button onclick="saveInstallmentData()" class="w-full bg-[#D870B8] text-white font-bold py-3 rounded-xl text-sm mt-4">บันทึกรายการผ่อน</button>
+            </div>
         </div>
     </div>
 
@@ -1566,18 +1568,6 @@
                 <label class="admin-label">รูปแบบส่งมอบ
                     <select id="productDeliveryType" class="admin-input" onchange="updateDeliveryFields()"><option value="custom">งานสั่งทำ / แอดมินส่งภายหลัง</option><option value="file">ไฟล์ขนาดเล็ก สามารถอัพโหลดและส่งสินค้าผ่านระบบเว็บได้</option><option value="code">ส่งสินค้าให้ลูกค้าอัตโนมัติหลังแอดมินกดยืนยันการชำระเงิน ( ตัดจากสต็อก )</option></select>
                 </label>
-                <div class="product-installment-box">
-                    <label class="admin-label flex items-center gap-2 mb-2"><input id="productInstallmentEnabled" type="checkbox" onchange="toggleProductInstallmentPlans()"> <span>เปิดให้ผ่อนสินค้านี้</span></label>
-                    <div id="productInstallmentPlans" class="hidden space-y-1.5">
-                        <p class="text-[10px] opacity-65 mb-2">เลือกช่วงเวลาที่อนุญาต และกำหนดจำนวนงวดของแต่ละแผนค่ะ</p>
-                        <div class="installment-plan-row"><label><input type="checkbox" data-installment-plan="days:7"> 7 วัน</label><select data-installment-count="days:7" class="admin-input"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option><option>12</option></select><span>งวด</span></div>
-                        <div class="installment-plan-row"><label><input type="checkbox" data-installment-plan="days:14"> 14 วัน</label><select data-installment-count="days:14" class="admin-input"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option><option>12</option></select><span>งวด</span></div>
-                        <div class="installment-plan-row"><label><input type="checkbox" data-installment-plan="days:30"> 30 วัน</label><select data-installment-count="days:30" class="admin-input"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option><option>12</option></select><span>งวด</span></div>
-                        <div class="installment-plan-row"><label><input type="checkbox" data-installment-plan="days:60"> 60 วัน</label><select data-installment-count="days:60" class="admin-input"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option><option>12</option></select><span>งวด</span></div>
-                        <div class="installment-plan-row"><label><input type="checkbox" data-installment-plan="months:3"> 3 เดือน</label><select data-installment-count="months:3" class="admin-input"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option><option>12</option></select><span>งวด</span></div>
-                        <div class="installment-plan-row"><label><input type="checkbox" data-installment-plan="months:6"> 6 เดือน</label><select data-installment-count="months:6" class="admin-input"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option><option>12</option></select><span>งวด</span></div>
-                    </div>
-                </div>
                 <label class="admin-label flex items-center gap-2"><input id="productSoldOut" type="checkbox"> หมดชั่วคราว (ปิดรับออร์เดอร์สินค้านี้)</label>
                 <div id="productDeliveryFileField" class="hidden"><label class="admin-label">ไฟล์สินค้า (ภาพจะย่อแบบคมชัด / ไฟล์อื่นไม่เกิน 300 KB)
                     <input id="productDeliveryFile" type="file" accept="image/*,.pdf,.txt" class="admin-input"></label><p id="productDeliveryFileInfo" class="text-[10px] text-[#7A6669]"></p></div>
@@ -1620,16 +1610,6 @@
             <label class="admin-label">ช่องทางติดต่อ (LINE / Facebook / เบอร์)<input id="checkoutContact" class="admin-input" maxlength="160" required></label>
             <label class="admin-label">อีเมล<input id="checkoutEmail" type="email" class="admin-input" maxlength="200" required></label>
             <label class="admin-label">โน้ตเพิ่มเติม<textarea id="checkoutNote" class="admin-input" maxlength="1000" rows="3"></textarea></label>
-            <div id="checkoutPaymentBox" class="checkout-payment-box hidden">
-                <div class="text-xs font-extrabold mb-2">วิธีชำระเงิน</div>
-                <label class="payment-choice"><input type="radio" name="checkoutPaymentMode" value="full" checked onchange="setCheckoutPaymentMode(this.value)"><span>ชำระเต็มจำนวน</span><b id="checkoutFullAmount"></b></label>
-                <label id="checkoutInstallmentChoice" class="payment-choice"><input type="radio" name="checkoutPaymentMode" value="installment" onchange="setCheckoutPaymentMode(this.value)"><span>ผ่อนสินค้า</span></label>
-                <div id="checkoutInstallmentOptions" class="hidden mt-2">
-                    <label class="admin-label">แผนผ่อน<select id="checkoutInstallmentPlan" class="admin-input" onchange="updateCheckoutInstallmentPreview()"></select></label>
-                    <div id="checkoutInstallmentPreview" class="text-[11px] bg-[var(--theme-soft)] rounded-xl p-3"></div>
-                    <div id="checkoutMemberHint" class="text-[10px] mt-2 opacity-70"></div>
-                </div>
-            </div>
             <p class="text-[10px] text-[#7A6669]">ร้านตรวจสอบการชำระเงินด้วยตนเอง โปรดเก็บเลขออร์เดอร์และรหัสรับสินค้าไว้</p>
             <button id="createOrderButton" class="w-full bg-[#D870B8] text-white rounded-xl py-3 text-sm font-bold">สร้างออร์เดอร์และดูวิธีชำระเงิน</button>
         </form>
@@ -1641,25 +1621,6 @@
         <button onclick="lookupGuestOrder()" id="lookupGuestOrderButton" class="w-full bg-[#D870B8] text-white rounded-xl py-2 text-sm font-bold">ดูสถานะ / รับสินค้า</button></div>
         <div id="lookupResult" class="mt-3 space-y-2 text-xs"></div>
     </div></div>
-    <div class="modal-overlay" id="memberAuthModal" onclick="if(event.target===this)closeMemberAuthModal()"><div class="modal-content">
-        <div class="flex justify-between items-center mb-3"><h3 class="font-bold" id="memberAuthTitle">♡ เข้าสู่ระบบสมาชิก</h3><button type="button" onclick="closeMemberAuthModal()" aria-label="ปิด">✕</button></div>
-        <form id="memberAuthForm" onsubmit="submitMemberAuth(event)" class="space-y-2">
-            <div id="memberRegisterFields" class="hidden space-y-2">
-                <label class="admin-label">ชื่อที่ใช้สั่งซื้อ<input id="memberName" class="admin-input" maxlength="120" required></label>
-                <label class="admin-label">เบอร์โทรศัพท์<input id="memberPhone" class="admin-input" inputmode="tel" maxlength="40" required></label>
-            </div>
-            <label class="admin-label">อีเมล<input id="memberEmail" type="email" class="admin-input" autocomplete="email" required></label>
-            <label class="admin-label">รหัสผ่าน<input id="memberPassword" type="password" class="admin-input" minlength="6" autocomplete="current-password" required></label>
-            <button id="memberAuthSubmit" class="w-full bg-[#D870B8] text-white rounded-xl py-3 text-sm font-bold">เข้าสู่ระบบ</button>
-            <button type="button" onclick="toggleMemberAuthMode()" id="memberAuthToggle" class="w-full text-xs font-bold text-[#D870B8]">ยังไม่มีบัญชี? สมัครสมาชิก</button>
-        </form>
-    </div></div>
-    <div class="modal-overlay" id="memberDashboardModal" onclick="if(event.target===this)closeMemberDashboard()"><div class="modal-content">
-        <div class="flex justify-between items-center mb-3"><h3 class="font-bold">♡ การผ่อนของฉัน ♡</h3><button type="button" onclick="closeMemberDashboard()" aria-label="ปิด">✕</button></div>
-        <div id="memberDashboardBody" class="space-y-3 text-xs"><div class="text-center opacity-60 py-5">กำลังโหลดข้อมูล...</div></div>
-        <button type="button" onclick="memberLogout()" class="w-full mt-3 border border-[#F8C8DC] text-[#D870B8] rounded-xl py-2.5 text-xs font-bold">ออกจากระบบ</button>
-    </div></div>
-
     <div class="viewport-wrapper">
         <div class="device-container">
 
@@ -1937,10 +1898,6 @@
         let shippingData = [];
         let installmentData = [];
         let checkQSubpage = 'chooser';
-        let checkoutPaymentMode = 'full';
-        let checkoutInstallmentPlans = [];
-        let memberAuthMode = 'login';
-        let memberDashboardOrders = [];
 
 
         function mergeCustomization(value) {
@@ -2097,8 +2054,6 @@
                     if (document.getElementById('pointsContainer')) renderPoints();
                     if (document.getElementById('shippingAdminList') && isAdminLoggedIn) loadShippingAdminData();
                     if (document.getElementById('installmentAdminList') && isAdminLoggedIn) loadInstallmentAdminData();
-                    if (document.getElementById('memberDashboardModal')?.classList.contains('active')) { if (user) loadMemberDashboard(); else closeMemberDashboard(); }
-                    updateCheckoutMemberHint();
                     if (activeShopTab !== 'home' && !productDetailOpen) renderProductCategory(activeShopTab);
                     if (isAdminLoggedIn) {
                         listenAdminOrders();
@@ -3329,111 +3284,53 @@
             <div class="tracking-card"><div class="font-bold text-xs mb-2">ประวัติการจัดส่ง</div><div class="tracking-timeline">${history.length?history.map((ev,i)=>`<div class="tracking-event ${i===0?'current':''}"><div class="text-xs font-bold">${escapeHtml(ev.label||statusInfo(ev.status).label||ev.status||'-')}</div><div class="text-[10px] opacity-65 mt-0.5">${escapeHtml(ev.detail||statusInfo(ev.status).detail||'')} · ${escapeHtml(formatDateTime(ev.at))}</div></div>`).join(''):`<div class="text-xs opacity-60">ยังไม่มีประวัติการจัดส่งค่ะ</div>`}</div></div>`;
         }
         function formatDateTime(value){if(!value)return '-';try{const d=new Date(Number(value));return d.toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'});}catch(_){return '-';}}
+        async function adminApi(action, payload={}){
+            if(!auth?.currentUser||auth.currentUser.uid!==ADMIN_UID) throw new Error('กรุณาเข้าสู่ระบบแอดมินก่อนค่ะ');
+            const token=await auth.currentUser.getIdToken(true);
+            const response=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({action,...payload})});
+            const result=await response.json().catch(()=>({}));
+            if(!response.ok||!result.ok) throw new Error(result.error||'ดำเนินการไม่สำเร็จค่ะ');
+            return result;
+        }
         async function openShippingAdminModal(id=''){
             if(!isAdminLoggedIn||auth?.currentUser?.uid!==ADMIN_UID)return showToast('กรุณาเข้าสู่ระบบแอดมินก่อนค่ะ');
-            populateShippingStatusSelect(); resetShippingForm(); document.getElementById('shippingEditId').value=id||'';
-            if(id){const item=shippingData.find(x=>x.id===id);if(item)fillShippingForm(item);}
-            document.getElementById('shippingAdminModal').classList.add('active'); await loadShippingAdminData();
+            populateShippingStatusSelect();
+            document.getElementById('shippingAdminModal').classList.add('active');
+            await loadShippingAdminData();
+            if(id==='new'){resetShippingForm();showShippingAdminForm();return;}
+            if(id){resetShippingForm();document.getElementById('shippingEditId').value=id;const item=shippingData.find(x=>x.id===id);if(item)fillShippingForm(item);showShippingAdminForm();}
         }
         function populateShippingStatusSelect(){const el=document.getElementById('shippingStatusInput');if(!el)return;el.innerHTML=shippingStatuses().map(s=>`<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('');}
         function resetShippingForm(){document.getElementById('shippingModalTitle').innerHTML='<i class="fas fa-box text-[#D870B8] mr-1"></i> เพิ่มรายการจัดส่ง';['shippingEditId','shippingNameInput','shippingPhone4Input','shippingCarrierInput','shippingTrackingInput','shippingDetailInput','shippingDueDateInput','shippingEventDetailInput'].forEach(id=>document.getElementById(id).value='');document.getElementById('shippingOrderDateInput').value=new Date().toISOString().slice(0,10);document.getElementById('shippingProgressInput').value=0;document.getElementById('shippingStatusInput').value=shippingStatuses()[0]?.id||'received';}
         function fillShippingForm(x){document.getElementById('shippingModalTitle').innerHTML='<i class="fas fa-edit text-[#D870B8] mr-1"></i> แก้ไขรายการจัดส่ง';document.getElementById('shippingNameInput').value=x.name||'';document.getElementById('shippingPhone4Input').value=x.phone4||'';document.getElementById('shippingCarrierInput').value=x.carrier||'';document.getElementById('shippingTrackingInput').value=x.trackingNo||'';document.getElementById('shippingDetailInput').value=x.detail||'';document.getElementById('shippingOrderDateInput').value=x.orderDate||'';document.getElementById('shippingDueDateInput').value=x.dueDate||'';document.getElementById('shippingStatusInput').value=x.status||'received';document.getElementById('shippingProgressInput').value=x.progress||0;document.getElementById('shippingEventDetailInput').value='';}
-        function closeShippingAdminModal(){document.getElementById('shippingAdminModal').classList.remove('active');}
+        function showShippingAdminForm(){document.getElementById('shippingAdminForm')?.classList.remove('hidden');}
+        function hideShippingAdminForm(){document.getElementById('shippingAdminForm')?.classList.add('hidden');resetShippingForm();}
+        function closeShippingAdminModal(){document.getElementById('shippingAdminModal').classList.remove('active');hideShippingAdminForm();}
         async function saveShippingData(){
             if(!db||!isAdminLoggedIn||auth?.currentUser?.uid!==ADMIN_UID)return showToast('กรุณาเข้าสู่ระบบแอดมินก่อนค่ะ');
             const oldId=document.getElementById('shippingEditId').value,name=document.getElementById('shippingNameInput').value.trim(),phone4=document.getElementById('shippingPhone4Input').value.replace(/\D/g,'').slice(-4),carrier=document.getElementById('shippingCarrierInput').value.trim(),trackingNo=document.getElementById('shippingTrackingInput').value.trim(),detail=document.getElementById('shippingDetailInput').value.trim(),orderDate=document.getElementById('shippingOrderDateInput').value,dueDate=document.getElementById('shippingDueDateInput').value,status=document.getElementById('shippingStatusInput').value,progress=Math.max(0,Math.min(100,Number(document.getElementById('shippingProgressInput').value)||0)),eventDetail=document.getElementById('shippingEventDetailInput').value.trim();
             if(!name||phone4.length!==4||!trackingNo)return showToast('กรุณากรอกชื่อ เบอร์ 4 ตัวท้าย และเลขพัสดุให้ครบค่ะ');
-            try{const id=await makeLookupKey(name,phone4), old=oldId?shippingData.find(x=>x.id===oldId):null;let history=Array.isArray(old?.history)?[...old.history]:[];if(!old||old.status!==status||eventDetail){const st=statusInfo(status);history.unshift({status,label:st.label,detail:eventDetail||st.detail,at:Date.now()});}const payload={name,phone4,carrier,trackingNo,detail,orderDate,dueDate,status,progress,history,updatedAt:Date.now(),createdAt:old?.createdAt||Date.now()};await db.collection('shipping_cakee').doc(id).set(payload,{merge:false});if(oldId&&oldId!==id)await db.collection('shipping_cakee').doc(oldId).delete();shippingData=[...shippingData.filter(x=>x.id!==oldId&&x.id!==id),{id,...payload}];renderShippingAdminList();resetShippingForm();showToast('บันทึกข้อมูลพัสดุแล้วค่ะ ✨');}catch(e){console.error(e);showToast('บันทึกข้อมูลพัสดุไม่สำเร็จค่ะ','fa-times-circle');}
+            try{const id=await makeLookupKey(name,phone4),old=oldId?shippingData.find(x=>x.id===oldId):null;let history=Array.isArray(old?.history)?[...old.history]:[];if(!old||old.status!==status||eventDetail){const st=statusInfo(status);history.unshift({status,label:st.label,detail:eventDetail||st.detail,at:Date.now()});}const result=await adminApi('admin-shipping-update',{id,oldId,name,phone4,carrier,trackingNo,detail,orderDate,dueDate,status,progress,history,createdAt:old?.createdAt||Date.now()});shippingData=[...shippingData.filter(x=>x.id!==oldId&&x.id!==id),result.shipping];renderShippingAdminList();hideShippingAdminForm();showToast('บันทึกข้อมูลพัสดุแล้วค่ะ ✨');}catch(e){console.error(e);showToast(e.message||'บันทึกข้อมูลพัสดุไม่สำเร็จค่ะ','fa-times-circle');}
         }
-        async function loadShippingAdminData(){if(!db||!isAdminLoggedIn||auth?.currentUser?.uid!==ADMIN_UID)return;try{const snap=await db.collection('shipping_cakee').get();shippingData=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>Number(b.updatedAt||0)-Number(a.updatedAt||0));renderShippingAdminList();}catch(e){console.error(e);const el=document.getElementById('shippingAdminList');if(el)el.innerHTML='<div class="p-3 text-xs text-center">โหลดรายการไม่สำเร็จค่ะ</div>';}}
-        function renderShippingAdminList(){const el=document.getElementById('shippingAdminList');if(!el)return;el.innerHTML=shippingData.length?shippingData.map(x=>{const st=statusInfo(x.status);return `<div class="admin-mini-row"><div class="flex justify-between gap-2"><div><b class="text-xs">${escapeHtml(x.name||'-')}</b><div class="text-[10px] opacity-60">${escapeHtml(x.trackingNo||'-')} · ${escapeHtml(st.label||x.status||'-')}</div></div><div class="flex gap-2 text-[10px]"><button onclick="openShippingAdminModal(${JSON.stringify(x.id)})" class="text-[#D870B8]">แก้ไข</button><button onclick="deleteShippingData(${JSON.stringify(x.id)})" class="text-rose-500">ลบ</button></div></div></div>`}).join(''):'<div class="p-4 text-xs text-center opacity-60">ยังไม่มีรายการพัสดุค่ะ</div>';}
-        async function deleteShippingData(id){if(!confirm('ลบรายการพัสดุนี้ใช่ไหมคะ?'))return;try{await db.collection('shipping_cakee').doc(id).delete();shippingData=shippingData.filter(x=>x.id!==id);renderShippingAdminList();showToast('ลบรายการพัสดุแล้วค่ะ');}catch(e){console.error(e);showToast('ลบรายการพัสดุไม่สำเร็จค่ะ','fa-times-circle');}}
+        async function loadShippingAdminData(){if(!db||!isAdminLoggedIn||auth?.currentUser?.uid!==ADMIN_UID)return;try{const result=await adminApi('admin-shipping-list');shippingData=Array.isArray(result.shipping)?result.shipping:[];renderShippingAdminList();}catch(e){console.error(e);const el=document.getElementById('shippingAdminList');if(el)el.innerHTML='<div class="p-3 text-xs text-center">'+escapeHtml(e.message||'โหลดรายการไม่สำเร็จค่ะ')+'</div>';}}
+        function renderShippingAdminList(){const el=document.getElementById('shippingAdminList');if(!el)return;const q=(document.getElementById('shippingAdminSearch')?.value||'').trim().toLowerCase();const list=shippingData.filter(x=>!q||String(x.name||'').toLowerCase().includes(q)||String(x.trackingNo||'').toLowerCase().includes(q));const active=shippingData.filter(x=>!['delivered','cancelled'].includes(String(x.status||''))).length;document.getElementById('shippingAdminCount')?.replaceChildren(document.createTextNode(String(shippingData.length)));document.getElementById('shippingAdminActive')?.replaceChildren(document.createTextNode(String(active)));el.innerHTML=list.length?list.map(x=>{const st=statusInfo(x.status);return `<div class="admin-mini-row"><div class="flex justify-between gap-2 items-center"><div class="min-w-0"><b class="text-xs">${escapeHtml(x.name||'-')}</b><div class="text-[10px] opacity-60 truncate">${escapeHtml(x.trackingNo||'-')} · ${escapeHtml(st.label||x.status||'-')}</div></div><div class="flex gap-2 text-[10px] shrink-0"><button onclick="openShippingAdminModal(${JSON.stringify(x.id)})" class="text-[#D870B8] font-bold">แก้ไข</button><button onclick="deleteShippingData(${JSON.stringify(x.id)})" class="text-rose-500 font-bold">ลบ</button></div></div></div>`}).join(''):'<div class="p-4 text-xs text-center opacity-60">ยังไม่มีรายการพัสดุค่ะ</div>';}
+        async function deleteShippingData(id){if(!confirm('ลบรายการพัสดุนี้ใช่ไหมคะ?'))return;try{await adminApi('admin-shipping-delete',{shippingId:id});shippingData=shippingData.filter(x=>x.id!==id);renderShippingAdminList();showToast('ลบรายการพัสดุแล้วค่ะ');}catch(e){console.error(e);showToast(e.message||'ลบรายการพัสดุไม่สำเร็จค่ะ','fa-times-circle');}}
 
         function renderInstallmentLookup(){
-            const c=document.getElementById('checkQContainer');if(!c)return;
-            if(auth?.currentUser){
-                c.innerHTML=`<button onclick="renderCheckQChooser()" class="text-xs font-bold text-[#D870B8] mb-3">← กลับเมนูเช็คข้อมูล</button><div class="tracking-card text-center"><div class="text-base font-extrabold">♡ การผ่อนของฉัน ♡</div><p class="text-[11px] opacity-70 mt-1 mb-4">บัญชีสมาชิกของคุณใช้เก็บรายการผ่อนและประวัติการชำระค่ะ</p><button onclick="openMemberDashboard()" class="w-full bg-[#D870B8] text-white rounded-xl py-2.5 text-xs font-bold">เปิดรายละเอียดการผ่อน</button></div><div id="memberCheckQResult" class="mt-3"></div>`;
-                openMemberDashboard(true);
-                return;
-            }
-            c.innerHTML=`<button onclick="renderCheckQChooser()" class="text-xs font-bold text-[#D870B8] mb-3">← กลับเมนูเช็คข้อมูล</button><div class="tracking-card text-center"><div class="text-base font-extrabold">♡ เช็คยอดผ่อนสินค้า ♡</div><p class="text-[11px] opacity-70 mt-1 mb-4">ระบบผ่อนใช้บัญชีสมาชิก เพื่อให้กลับมาดูยอดและชำระงวดต่อไปได้แม้เวลาผ่านไปนานค่ะ</p><button onclick="openMemberAuthModal('login')" class="w-full bg-[#D870B8] text-white rounded-xl py-2.5 text-xs font-bold mb-2">เข้าสู่ระบบ</button><button onclick="openMemberAuthModal('register')" class="w-full border border-[#F8C8DC] text-[#D870B8] rounded-xl py-2.5 text-xs font-bold">สมัครสมาชิก</button></div>`;
+            const c=document.getElementById('checkQContainer');if(!c)return;c.innerHTML=`<button onclick="renderCheckQChooser()" class="text-xs font-bold text-[#D870B8] mb-3">← กลับเมนูเช็คข้อมูล</button><div class="tracking-card"><div class="text-center mb-3"><div class="text-base font-extrabold">♡ เช็คยอดผ่อนสินค้า ♡</div><p class="text-[11px] opacity-70 mt-1">กรอกชื่อและเบอร์โทรศัพท์ 4 ตัวท้ายเพื่อดูยอดของคุณ</p></div><form onsubmit="lookupInstallment(event)" class="space-y-2"><input id="installmentLookupName" required class="admin-input" autocomplete="off" placeholder="ชื่อ - นามสกุล"><input id="installmentLookupPhone4" required inputmode="numeric" maxlength="4" pattern="[0-9]{4}" class="admin-input" placeholder="เบอร์โทรศัพท์ 4 ตัวท้าย"><button class="w-full bg-[#D870B8] text-white rounded-xl py-2.5 text-xs font-bold"><i class="fas fa-search mr-1"></i> ตรวจสอบยอดผ่อน</button></form></div><div id="installmentLookupResult"></div>`;
         }
-        function openMemberAuthModal(mode='login'){memberAuthMode=mode==='register'?'register':'login';renderMemberAuthForm();document.getElementById('memberAuthModal').classList.add('active');}
-        function closeMemberAuthModal(){document.getElementById('memberAuthModal').classList.remove('active');}
-        function toggleMemberAuthMode(){memberAuthMode=memberAuthMode==='login'?'register':'login';renderMemberAuthForm();}
-        function renderMemberAuthForm(){
-            const register=memberAuthMode==='register';
-            document.getElementById('memberAuthTitle').textContent=register?'♡ สมัครสมาชิก':'♡ เข้าสู่ระบบสมาชิก';
-            document.getElementById('memberRegisterFields').classList.toggle('hidden',!register);
-            document.getElementById('memberName').required=register;document.getElementById('memberPhone').required=register;
-            document.getElementById('memberPassword').autocomplete=register?'new-password':'current-password';
-            document.getElementById('memberAuthSubmit').textContent=register?'สมัครสมาชิก':'เข้าสู่ระบบ';
-            document.getElementById('memberAuthToggle').textContent=register?'มีบัญชีแล้ว? เข้าสู่ระบบ':'ยังไม่มีบัญชี? สมัครสมาชิก';
-        }
-        async function submitMemberAuth(event){
-            event.preventDefault();if(!auth)return showToast('Firebase ยังไม่พร้อมใช้งานค่ะ','fa-times-circle');
-            const email=document.getElementById('memberEmail').value.trim(),pass=document.getElementById('memberPassword').value;
-            try{
-                let cred;
-                if(memberAuthMode==='register'){
-                    cred=await auth.createUserWithEmailAndPassword(email,pass);
-                    const token=await cred.user.getIdToken();
-                    const response=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({action:'customer-profile',name:document.getElementById('memberName').value.trim(),phone:document.getElementById('memberPhone').value.trim(),email})});
-                    const result=await response.json().catch(()=>({}));
-                    if(!response.ok||!result.ok)throw new Error(result.error||'บันทึกข้อมูลสมาชิกไม่สำเร็จค่ะ');
-                    showToast('สมัครสมาชิกสำเร็จค่ะ ♡');
-                }else{cred=await auth.signInWithEmailAndPassword(email,pass);showToast('เข้าสู่ระบบสำเร็จค่ะ ♡');}
-                closeMemberAuthModal();
-                if(checkQSubpage==='installment')renderInstallmentLookup();
-                updateCheckoutMemberHint();
-            }catch(e){console.error(e);showToast(e.message||'เข้าสู่ระบบไม่สำเร็จค่ะ','fa-times-circle');}
-        }
-        async function memberLogout(){if(auth)await auth.signOut();closeMemberDashboard();if(checkQSubpage==='installment')renderInstallmentLookup();showToast('ออกจากระบบแล้วค่ะ');}
-        async function openMemberDashboard(fromCheckQ=false){
-            if(!auth?.currentUser){openMemberAuthModal('login');return;}
-            document.getElementById('memberDashboardModal').classList.add('active');
-            await loadMemberDashboard();
-        }
-        function closeMemberDashboard(){document.getElementById('memberDashboardModal').classList.remove('active');}
-        async function loadMemberDashboard(){
-            const body=document.getElementById('memberDashboardBody');if(!body)return;body.innerHTML='<div class="text-center opacity-60 py-5">กำลังโหลดข้อมูลการผ่อน... ♡</div>';
-            try{
-                const token=await auth.currentUser.getIdToken();
-                const response=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({action:'installment-list'})});
-                const data=await response.json().catch(()=>({}));
-                if(!response.ok||!data.ok)throw new Error(data.error||'โหลดข้อมูลไม่สำเร็จค่ะ');
-                memberDashboardOrders=Array.isArray(data.installments)?data.installments:[];renderMemberDashboard();
-            }catch(e){console.error(e);body.innerHTML=`<div class="tracking-card text-center">${escapeHtml(e.message||'โหลดข้อมูลไม่สำเร็จค่ะ')}</div>`;}
-        }
-        function renderMemberDashboard(){
-            const body=document.getElementById('memberDashboardBody');if(!body)return;
-            if(!memberDashboardOrders.length){body.innerHTML='<div class="tracking-card text-center py-5"><div class="font-extrabold">ยังไม่มีรายการผ่อนค่ะ</div><p class="text-[10px] opacity-65 mt-1">เมื่อสั่งซื้อสินค้าแบบผ่อน รายการจะมาแสดงตรงนี้ค่ะ</p></div>';return;}
-            body.innerHTML=memberDashboardOrders.map((order,index)=>{
-                const inst=order.installment||{},schedule=Array.isArray(inst.schedule)?inst.schedule:[],total=Number(order.totalCents||0),paid=Number(inst.paidCents||0),remaining=Math.max(0,Number(inst.remainingCents??(total-paid))),pct=total?Math.max(0,Math.min(100,paid/total*100)):0,currentNo=Number(inst.currentInstallment||1),current=schedule.find(x=>Number(x.number)===currentNo),final=order.status==='paid'||remaining<=0;
-                const inputId=`memberSlip_${index}_${order.id}`;
-                return `<div class="member-installment-card"><div class="flex justify-between gap-2"><div><div class="text-[10px] opacity-60">${escapeHtml(order.orderNo||'ออเดอร์')}</div><div class="font-extrabold text-sm">${escapeHtml((order.items||[]).map(x=>x.title).join(', ')||'สินค้า')}</div></div><span class="px-2 py-1 rounded-full text-[9px] font-bold bg-[var(--theme-soft)] text-[var(--theme-primary)]">${final?'ชำระครบแล้ว':'กำลังผ่อน'}</span></div><div class="grid grid-cols-3 gap-2 mt-3 text-center"><div><div class="text-[9px] opacity-60">ยอดทั้งหมด</div><b>${money(total)}</b></div><div><div class="text-[9px] opacity-60">ชำระแล้ว</div><b>${money(paid)}</b></div><div><div class="text-[9px] opacity-60">คงเหลือ</div><b>${money(remaining)}</b></div></div><div class="flex justify-between text-[10px] mt-3 mb-1"><span>ความคืบหน้า</span><b>${Math.round(pct)}%</b></div><div class="member-progress"><div style="width:${pct}%"></div></div>${!final&&current?`<div class="mt-3 p-3 rounded-xl bg-[var(--theme-soft)]"><div class="font-extrabold">งวดที่ ${currentNo} / ${schedule.length}</div><div class="text-[10px] mt-1">ยอดงวดนี้ <b>${money(Number(current.amountCents||0))}</b></div><div class="text-[10px]">ครบกำหนด ${escapeHtml(new Date(current.dueAt).toLocaleDateString('th-TH'))}</div><input id="${inputId}" type="file" accept="image/jpeg,image/png,image/webp" class="admin-input mt-2"><button type="button" onclick="submitMemberInstallmentSlip('${order.id}','${inputId}',this)" class="w-full mt-2 bg-[#D870B8] text-white rounded-xl py-2.5 text-xs font-bold">อัปโหลดสลิปงวดนี้</button></div>`:''}<div class="mt-3 pt-2 border-t border-[var(--theme-border)]"><div class="text-[10px] font-bold mb-1">ประวัติงวด</div>${schedule.map(item=>{const done=Number(item.number)<currentNo||final;return `<div class="member-schedule-row"><span>งวด ${item.number}</span><span>${money(Number(item.amountCents||0))}</span><span>${done?'✓ ชำระแล้ว':Number(item.number)===currentNo?'รอชำระ':'รอถึงงวด'}</span></div>`}).join('')}</div></div>`;
-            }).join('');
-        }
-        async function submitMemberInstallmentSlip(orderId,inputId,button){
-            const input=document.getElementById(inputId),file=input?.files?.[0];if(!file)return showToast('กรุณาเลือกสลิปก่อนค่ะ','fa-exclamation-circle');
-            if(!auth?.currentUser)return showToast('กรุณาเข้าสู่ระบบก่อนค่ะ','fa-user');button.disabled=true;button.textContent='กำลังตรวจสลิป...';
-            try{
-                const image=await compressToBase64Image(file,{maxDimension:1600,quality:0.82,maxDataUrlBytes:650*1024});
-                const token=await auth.currentUser.getIdToken();
-                const response=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({action:'installment-submit-slip',token:orderId,image})});
-                const data=await response.json().catch(()=>({}));if(!response.ok||!data.ok)throw new Error(data.error||'ตรวจสลิปไม่สำเร็จค่ะ');
-                showToast(data.message||'ชำระงวดสำเร็จค่ะ ♡');input.value='';await loadMemberDashboard();
-            }catch(e){console.error(e);showToast(e.message||'ส่งสลิปไม่สำเร็จค่ะ','fa-times-circle');}finally{button.disabled=false;button.textContent='อัปโหลดสลิปงวดนี้';}
-        }
-
-        async function openInstallmentAdminModal(id=''){if(!isAdminLoggedIn||auth?.currentUser?.uid!==ADMIN_UID)return showToast('กรุณาเข้าสู่ระบบแอดมินก่อนค่ะ');resetInstallmentForm();document.getElementById('installmentEditId').value=id||'';if(id){const x=installmentData.find(v=>v.id===id);if(x)fillInstallmentForm(x);}document.getElementById('installmentAdminModal').classList.add('active');await loadInstallmentAdminData();}
+        async function lookupInstallment(event){event.preventDefault();const result=document.getElementById('installmentLookupResult'),name=document.getElementById('installmentLookupName').value.trim(),phone4=document.getElementById('installmentLookupPhone4').value.replace(/\D/g,'').slice(-4);result.innerHTML='<div class="tracking-card text-center text-xs">กำลังค้นหาข้อมูล... ♡</div>';try{const snap=await db.collection('installments_cakee').where('name','==',name).where('phone4','==',phone4).limit(1).get();if(snap.empty){result.innerHTML='<div class="tracking-card text-center text-xs">ไม่พบข้อมูลยอดผ่อนค่ะ กรุณาตรวจสอบชื่อและเลข 4 ตัวท้ายอีกครั้ง</div>';return;}renderInstallmentResult({id:snap.docs[0].id,...snap.docs[0].data()},result);}catch(e){console.error(e);result.innerHTML='<div class="tracking-card text-center text-xs">ไม่สามารถค้นหาข้อมูลได้ค่ะ กรุณาลองใหม่อีกครั้ง</div>';}}
+        function renderInstallmentResult(x,target){const total=Number.isFinite(Number(x.total))?Number(x.total):Math.max(0,Number(x.totalCents||0)/100),paid=Number.isFinite(Number(x.paid))?Number(x.paid):Math.max(0,Number(x.paidCents||0)/100),remaining=Math.max(0,Number.isFinite(Number(x.remaining))?Number(x.remaining):total-paid),pct=total?Math.max(0,Math.min(100,paid/total*100)):0;const status=x.statusLabel||({'active':'กำลังผ่อน','completed':'ชำระครบแล้ว','cancelled':'ยกเลิก'}[x.status]||x.status||'กำลังผ่อน'),installmentNo=x.installmentNo||x.currentInstallment||'-',totalInstallments=x.totalInstallments||x.installmentCount||'-';target.innerHTML=`<div class="tracking-card"><div class="flex justify-between gap-2"><div><div class="text-[10px] opacity-60">รายการ</div><div class="font-extrabold text-sm">${escapeHtml(x.product||'สินค้า')}</div></div><span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#FFF5FB] text-[#D870B8] border border-[#F8C8DC]">${escapeHtml(status)}</span></div><div class="text-xs mt-3">${escapeHtml(x.name||'')} · ออเดอร์ ${escapeHtml(x.orderNo||'-')}</div><div class="grid grid-cols-3 gap-2 mt-4 text-center"><div class="bg-[var(--theme-soft)] rounded-xl p-2"><div class="text-[9px] opacity-60">ยอดทั้งหมด</div><b class="text-xs">฿${total.toLocaleString()}</b></div><div class="bg-[var(--theme-soft)] rounded-xl p-2"><div class="text-[9px] opacity-60">ชำระแล้ว</div><b class="text-xs">฿${paid.toLocaleString()}</b></div><div class="bg-[var(--theme-soft)] rounded-xl p-2"><div class="text-[9px] opacity-60">คงเหลือ</div><b class="text-xs">฿${remaining.toLocaleString()}</b></div></div><div class="flex justify-between text-[10px] mt-4 mb-1"><span>ชำระแล้ว</span><b>${Math.round(pct)}%</b></div><div class="tracking-progress"><div style="width:${pct}%"></div></div><div class="grid grid-cols-2 gap-2 mt-4 text-[10px]"><div>งวดที่<br><b>${escapeHtml(installmentNo)} / ${escapeHtml(totalInstallments)}</b></div><div>งวดถัดไป<br><b>${escapeHtml(x.nextDueDate||'-')}</b></div></div>${x.note?`<div class="mt-3 p-3 rounded-xl bg-[var(--theme-soft)] text-[11px] whitespace-pre-line">${escapeHtml(x.note)}</div>`:''}</div>`;}
+        async function openInstallmentAdminModal(id=''){if(!isAdminLoggedIn||auth?.currentUser?.uid!==ADMIN_UID)return showToast('กรุณาเข้าสู่ระบบแอดมินก่อนค่ะ');document.getElementById('installmentAdminModal').classList.add('active');await loadInstallmentAdminData();if(id==='new'){resetInstallmentForm();showInstallmentAdminForm();return;}if(id){resetInstallmentForm();document.getElementById('installmentEditId').value=id;const x=installmentData.find(v=>v.id===id);if(x)fillInstallmentForm(x);showInstallmentAdminForm();}}
         function resetInstallmentForm(){document.getElementById('installmentModalTitle').innerHTML='<i class="fas fa-wallet text-[#D870B8] mr-1"></i> เพิ่มรายการผ่อนสินค้า';['installmentEditId','installmentNameInput','installmentPhone4Input','installmentOrderInput','installmentProductInput','installmentTotalInput','installmentPaidInput','installmentNoInput','installmentTotalNoInput','installmentDueDateInput','installmentNoteInput'].forEach(id=>document.getElementById(id).value='');document.getElementById('installmentStatusInput').value='กำลังผ่อน';}
-        function fillInstallmentForm(x){document.getElementById('installmentModalTitle').innerHTML='<i class="fas fa-edit text-[#D870B8] mr-1"></i> แก้ไขรายการผ่อนสินค้า';document.getElementById('installmentNameInput').value=x.name||'';document.getElementById('installmentPhone4Input').value=x.phone4||'';document.getElementById('installmentOrderInput').value=x.orderNo||'';document.getElementById('installmentProductInput').value=x.product||'';document.getElementById('installmentTotalInput').value=x.total??'';document.getElementById('installmentPaidInput').value=x.paid??'';document.getElementById('installmentNoInput').value=x.installmentNo??'';document.getElementById('installmentTotalNoInput').value=x.totalInstallments??'';document.getElementById('installmentDueDateInput').value=x.nextDueDate||'';document.getElementById('installmentStatusInput').value=x.status||'กำลังผ่อน';document.getElementById('installmentNoteInput').value=x.note||'';}
-        function closeInstallmentAdminModal(){document.getElementById('installmentAdminModal').classList.remove('active');}
-        async function saveInstallmentData(){if(!db||!isAdminLoggedIn||auth?.currentUser?.uid!==ADMIN_UID)return showToast('กรุณาเข้าสู่ระบบแอดมินก่อนค่ะ');const oldId=document.getElementById('installmentEditId').value,name=document.getElementById('installmentNameInput').value.trim(),phone4=document.getElementById('installmentPhone4Input').value.replace(/\D/g,'').slice(-4),orderNo=document.getElementById('installmentOrderInput').value.trim(),product=document.getElementById('installmentProductInput').value.trim(),total=Math.max(0,Number(document.getElementById('installmentTotalInput').value)||0),paid=Math.max(0,Number(document.getElementById('installmentPaidInput').value)||0),installmentNo=Number(document.getElementById('installmentNoInput').value)||1,totalInstallments=Number(document.getElementById('installmentTotalNoInput').value)||1,nextDueDate=document.getElementById('installmentDueDateInput').value,status=document.getElementById('installmentStatusInput').value,note=document.getElementById('installmentNoteInput').value.trim();if(!name||phone4.length!==4)return showToast('กรุณากรอกชื่อและเบอร์ 4 ตัวท้ายให้ครบค่ะ');try{const id=await makeLookupKey(name,phone4),payload={name,phone4,orderNo,product,total,paid,installmentNo,totalInstallments,nextDueDate,status,note,updatedAt:Date.now(),createdAt:installmentData.find(x=>x.id===oldId)?.createdAt||Date.now()};await db.collection('installments_cakee').doc(id).set(payload,{merge:false});if(oldId&&oldId!==id)await db.collection('installments_cakee').doc(oldId).delete();installmentData=[...installmentData.filter(x=>x.id!==oldId&&x.id!==id),{id,...payload}];renderInstallmentAdminList();resetInstallmentForm();showToast('บันทึกข้อมูลยอดผ่อนแล้วค่ะ ✨');}catch(e){console.error(e);showToast('บันทึกข้อมูลยอดผ่อนไม่สำเร็จค่ะ','fa-times-circle');}}
-        async function loadInstallmentAdminData(){if(!db||!isAdminLoggedIn||auth?.currentUser?.uid!==ADMIN_UID)return;try{const snap=await db.collection('installments_cakee').get();installmentData=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>Number(b.updatedAt||0)-Number(a.updatedAt||0));renderInstallmentAdminList();}catch(e){console.error(e);const el=document.getElementById('installmentAdminList');if(el)el.innerHTML='<div class="p-3 text-xs text-center">โหลดรายการไม่สำเร็จค่ะ</div>';}}
-        function renderInstallmentAdminList(){const el=document.getElementById('installmentAdminList');if(!el)return;el.innerHTML=installmentData.length?installmentData.map(x=>`<div class="admin-mini-row"><div class="flex justify-between gap-2"><div><b class="text-xs">${escapeHtml(x.name||'-')}</b><div class="text-[10px] opacity-60">${escapeHtml(x.product||'-')} · เหลือ ฿${Math.max(0,(Number(x.total)||0)-(Number(x.paid)||0)).toLocaleString()}</div></div><div class="flex gap-2 text-[10px]"><button onclick="openInstallmentAdminModal(${JSON.stringify(x.id)})" class="text-[#D870B8]">แก้ไข</button><button onclick="deleteInstallmentData(${JSON.stringify(x.id)})" class="text-rose-500">ลบ</button></div></div></div>`).join(''):'<div class="p-4 text-xs text-center opacity-60">ยังไม่มีรายการผ่อนค่ะ</div>';}
-        async function deleteInstallmentData(id){if(!confirm('ลบรายการผ่อนนี้ใช่ไหมคะ?'))return;try{await db.collection('installments_cakee').doc(id).delete();installmentData=installmentData.filter(x=>x.id!==id);renderInstallmentAdminList();showToast('ลบรายการผ่อนแล้วค่ะ');}catch(e){console.error(e);showToast('ลบรายการผ่อนไม่สำเร็จค่ะ','fa-times-circle');}}
+        function fillInstallmentForm(x){document.getElementById('installmentModalTitle').innerHTML='<i class="fas fa-edit text-[#D870B8] mr-1"></i> แก้ไขรายการผ่อนสินค้า';document.getElementById('installmentNameInput').value=x.name||'';document.getElementById('installmentPhone4Input').value=x.phone4||'';document.getElementById('installmentOrderInput').value=x.orderNo||'';document.getElementById('installmentProductInput').value=x.product||'';document.getElementById('installmentTotalInput').value=x.total??'';document.getElementById('installmentPaidInput').value=x.paid??'';document.getElementById('installmentNoInput').value=x.installmentNo??'';document.getElementById('installmentTotalNoInput').value=x.totalInstallments??'';document.getElementById('installmentDueDateInput').value=x.nextDueDate||'';document.getElementById('installmentStatusInput').value=x.statusLabel||x.status||'กำลังผ่อน';document.getElementById('installmentNoteInput').value=x.note||'';}
+        function showInstallmentAdminForm(){document.getElementById('installmentAdminForm')?.classList.remove('hidden');}
+        function hideInstallmentAdminForm(){document.getElementById('installmentAdminForm')?.classList.add('hidden');resetInstallmentForm();}
+        function closeInstallmentAdminModal(){document.getElementById('installmentAdminModal').classList.remove('active');hideInstallmentAdminForm();}
+        async function saveInstallmentData(){if(!db||!isAdminLoggedIn||auth?.currentUser?.uid!==ADMIN_UID)return showToast('กรุณาเข้าสู่ระบบแอดมินก่อนค่ะ');const oldId=document.getElementById('installmentEditId').value,name=document.getElementById('installmentNameInput').value.trim(),phone4=document.getElementById('installmentPhone4Input').value.replace(/\D/g,'').slice(-4),orderNo=document.getElementById('installmentOrderInput').value.trim(),product=document.getElementById('installmentProductInput').value.trim(),total=Math.max(0,Number(document.getElementById('installmentTotalInput').value)||0),paid=Math.max(0,Number(document.getElementById('installmentPaidInput').value)||0),installmentNo=Number(document.getElementById('installmentNoInput').value)||1,totalInstallments=Number(document.getElementById('installmentTotalNoInput').value)||1,nextDueDate=document.getElementById('installmentDueDateInput').value,status=document.getElementById('installmentStatusInput').value,note=document.getElementById('installmentNoteInput').value.trim();if(!name||phone4.length!==4)return showToast('กรุณากรอกชื่อและเบอร์ 4 ตัวท้ายให้ครบค่ะ');try{const id=oldId||await makeLookupKey(name,phone4);const result=await adminApi('admin-installment-update',{installmentId:id,name,phone4,orderNo,product,total,paid,installmentNo,totalInstallments,nextDueDate,status,note});installmentData=[...installmentData.filter(x=>x.id!==id),result.installment];renderInstallmentAdminList();hideInstallmentAdminForm();showToast('บันทึกข้อมูลยอดผ่อนแล้วค่ะ ✨');}catch(e){console.error(e);showToast(e.message||'บันทึกข้อมูลยอดผ่อนไม่สำเร็จค่ะ','fa-times-circle');}}
+        async function loadInstallmentAdminData(){if(!db||!isAdminLoggedIn||auth?.currentUser?.uid!==ADMIN_UID)return;try{const result=await adminApi('admin-installment-list');installmentData=Array.isArray(result.installments)?result.installments:[];renderInstallmentAdminList();}catch(e){console.error(e);const el=document.getElementById('installmentAdminList');if(el)el.innerHTML='<div class="p-3 text-xs text-center">'+escapeHtml(e.message||'โหลดรายการไม่สำเร็จค่ะ')+'</div>';}}
+        function renderInstallmentAdminList(){const el=document.getElementById('installmentAdminList');if(!el)return;const q=(document.getElementById('installmentAdminSearch')?.value||'').trim().toLowerCase();const list=installmentData.filter(x=>!q||String(x.name||'').toLowerCase().includes(q)||String(x.orderNo||'').toLowerCase().includes(q)||String(x.product||'').toLowerCase().includes(q));const totalRemaining=installmentData.reduce((sum,x)=>sum+Math.max(0,(Number(x.total)||Number(x.totalCents||0)/100)-(Number(x.paid)||Number(x.paidCents||0)/100)),0);const active=installmentData.filter(x=>!['ชำระครบแล้ว','completed','ยกเลิก','cancelled'].includes(String(x.statusLabel||x.status||''))).length;document.getElementById('installmentAdminCount')?.replaceChildren(document.createTextNode(String(installmentData.length)));document.getElementById('installmentAdminActive')?.replaceChildren(document.createTextNode(String(active)));document.getElementById('installmentAdminRemaining')?.replaceChildren(document.createTextNode('฿'+Math.round(totalRemaining).toLocaleString()));el.innerHTML=list.length?list.map(x=>{const total=Number(x.total)||Number(x.totalCents||0)/100,paid=Number(x.paid)||Number(x.paidCents||0)/100,remaining=Math.max(0,total-paid),pct=total?Math.min(100,paid/total*100):0,status=x.statusLabel||({'active':'กำลังผ่อน','completed':'ชำระครบแล้ว','cancelled':'ยกเลิก'}[x.status]||x.status||'กำลังผ่อน');return `<div class="admin-mini-row"><div class="flex justify-between gap-2 items-center"><div class="min-w-0 flex-1"><div class="flex items-center gap-2"><b class="text-xs truncate">${escapeHtml(x.name||'-')}</b><span class="text-[9px] px-2 py-0.5 rounded-full bg-[#FFF5FB] text-[#D870B8] border border-[#F8C8DC]">${escapeHtml(status)}</span></div><div class="text-[10px] opacity-60 mt-1 truncate">${escapeHtml(x.product||'-')} · ${escapeHtml(x.orderNo||'-')}</div><div class="mt-2 h-1.5 rounded-full bg-[#F4E7ED] overflow-hidden"><div style="width:${pct}%" class="h-full bg-[#D870B8]"></div></div><div class="text-[10px] mt-1">ชำระ ฿${paid.toLocaleString()} · <b>เหลือ ฿${remaining.toLocaleString()}</b> · งวด ${escapeHtml(x.installmentNo||'-')}/${escapeHtml(x.totalInstallments||x.installmentCount||'-')}</div></div><div class="flex flex-col gap-1 text-[10px] shrink-0"><button onclick="openInstallmentAdminModal(${JSON.stringify(x.id)})" class="text-[#D870B8] font-bold">แก้ไข</button><button onclick="deleteInstallmentData(${JSON.stringify(x.id)})" class="text-rose-500 font-bold">ลบ</button></div></div></div>`}).join(''):'<div class="p-4 text-xs text-center opacity-60">ยังไม่มีรายการผ่อนค่ะ</div>';}
+        async function deleteInstallmentData(id){if(!confirm('ลบรายการผ่อนนี้ใช่ไหมคะ?'))return;try{await adminApi('admin-installment-delete',{installmentId:id});installmentData=installmentData.filter(x=>x.id!==id);renderInstallmentAdminList();showToast('ลบรายการผ่อนแล้วค่ะ');}catch(e){console.error(e);showToast(e.message||'ลบรายการผ่อนไม่สำเร็จค่ะ','fa-times-circle');}}
 
         function setQueueTab(tab) { queueTab = tab; currentQueuePage = 1; renderQueueList(); }
 
@@ -4808,8 +4705,6 @@
             document.getElementById('productPriceBaht').value = prod?.priceBaht || '';
             document.getElementById('productDeliveryType').value = prod?.deliveryType || 'custom';
             document.getElementById('productSoldOut').checked = !!prod?.soldOut;
-            document.getElementById('productInstallmentEnabled').checked = prod?.installmentEnabled === true;
-            setProductInstallmentPlans(prod?.installmentPlans || []);
             productCodeInventoryReady = false;
             productCodeOriginal = [];
             renderProductCodeInputs(['']);
@@ -4848,14 +4743,6 @@
             document.getElementById('productModal').classList.remove('active');
         }
 
-        function toggleProductInstallmentPlans(){document.getElementById('productInstallmentPlans')?.classList.toggle('hidden',!document.getElementById('productInstallmentEnabled')?.checked);}
-        function setProductInstallmentPlans(plans){
-            document.querySelectorAll('[data-installment-plan]').forEach(box=>{const key=box.dataset.installmentPlan;const found=(Array.isArray(plans)?plans:[]).find(p=>`${p.unit}:${p.duration}`===key);box.checked=!!found;const sel=document.querySelector(`[data-installment-count="${key}"]`);if(sel)sel.value=String(found?.installments||2);});toggleProductInstallmentPlans();
-        }
-        function getProductInstallmentPlans(){
-            const out=[];document.querySelectorAll('[data-installment-plan]').forEach(box=>{if(!box.checked)return;const [unit,duration]=box.dataset.installmentPlan.split(':');const sel=document.querySelector(`[data-installment-count="${box.dataset.installmentPlan}"]`);const installments=Number(sel?.value||2);if(['days','weeks','months'].includes(unit)&&Number.isInteger(Number(duration))&&installments>=2)out.push({unit,duration:Number(duration),installments});});return out;
-        }
-
         async function saveProduct(event) {
             event.preventDefault();
             if (!isAdminLoggedIn || !auth?.currentUser || auth.currentUser.uid !== ADMIN_UID || !db) return;
@@ -4882,8 +4769,6 @@
                     category, subcategory, title, priceBaht: numericPrice > 0 ? Math.round(numericPrice * 100) / 100 : 0,
                     deliveryType: document.getElementById('productDeliveryType').value,
                     soldOut: document.getElementById('productSoldOut').checked,
-                    installmentEnabled: document.getElementById('productInstallmentEnabled').checked,
-                    installmentPlans: document.getElementById('productInstallmentEnabled').checked ? getProductInstallmentPlans() : [],
                     price: document.getElementById('productPrice').value.trim(),
                     description: document.getElementById('productDescription').value.trim(),
                     link: externalLink, linkText: document.getElementById('productLinkText').value.trim(),
@@ -5139,68 +5024,18 @@
         }
         function openCart() { renderCart(); document.getElementById('cartModal').classList.add('active'); }
         function closeCart() { document.getElementById('cartModal').classList.remove('active'); }
-        function getCartInstallmentPlans(lines){
-            if(!lines.length) return [];
-            const productPlans=lines.map(({product})=>Array.isArray(product.installmentPlans)?product.installmentPlans.filter(Boolean):[]);
-            if(productPlans.some(plans=>!plans.length)) return [];
-            const first=productPlans[0];
-            return first.filter(plan=>productPlans.every(plans=>plans.some(p=>String(p.unit)===String(plan.unit)&&Number(p.duration)===Number(plan.duration)&&Number(p.installments)===Number(plan.installments))))
-                .map(p=>({unit:String(p.unit),duration:Number(p.duration),installments:Number(p.installments)}));
-        }
-        function formatInstallmentPlan(plan){
-            if(!plan)return ''; const unit=plan.unit==='days'?'วัน':plan.unit==='weeks'?'สัปดาห์':'เดือน'; return `${plan.duration} ${unit} · ${plan.installments} งวด`;
-        }
         function openCheckout() {
             const lines=cartLines();
             if (!lines.length || !cartTotalCents(lines)) return showToast('กรุณาเลือกสินค้าก่อนค่ะ');
             const stockError = cartAvailabilityMessage(lines);
             if (stockError) return showToast(stockError);
-            const total=cartTotalCents(lines);
-            checkoutInstallmentPlans=getCartInstallmentPlans(lines);
-            checkoutPaymentMode='full';
-            document.getElementById('checkoutSummary').textContent=lines.map(({product,qty})=>`${product.title || 'สินค้า'} × ${qty} — ${money(Math.round(Number(product.priceBaht)*100)*qty)}`).join('\n')+'\nรวม '+money(total);
-            document.getElementById('checkoutFullAmount').textContent=money(total);
-            const box=document.getElementById('checkoutPaymentBox');
-            const choice=document.getElementById('checkoutInstallmentChoice');
-            if(checkoutInstallmentPlans.length){
-                box.classList.remove('hidden'); choice.classList.remove('hidden');
-                const sel=document.getElementById('checkoutInstallmentPlan');
-                sel.innerHTML=checkoutInstallmentPlans.map((p,i)=>`<option value="${p.unit}:${p.duration}:${p.installments}">${formatInstallmentPlan(p)}</option>`).join('');
-            }else{
-                box.classList.add('hidden'); choice.classList.add('hidden');
-                document.querySelector('input[name="checkoutPaymentMode"][value="full"]').checked=true;
-            }
-            setCheckoutPaymentMode('full');
-            const email=document.getElementById('checkoutEmail');
-            if(auth?.currentUser?.email && !email.value) email.value=auth.currentUser.email;
+            document.getElementById('checkoutSummary').textContent=lines.map(({product,qty})=>`${product.title || 'สินค้า'} × ${qty} — ${money(Math.round(Number(product.priceBaht)*100)*qty)}`).join('\n')+'\nรวม '+money(cartTotalCents(lines));
             closeCart(); document.getElementById('checkoutModal').classList.add('active');
         }
         function closeCheckout() { document.getElementById('checkoutModal').classList.remove('active'); }
-        function setCheckoutPaymentMode(mode){
-            checkoutPaymentMode=mode==='installment'?'installment':'full';
-            const opts=document.getElementById('checkoutInstallmentOptions');
-            const planBox=document.getElementById('checkoutPaymentBox');
-            if(opts) opts.classList.toggle('hidden',checkoutPaymentMode!=='installment');
-            if(planBox && checkoutInstallmentPlans.length) planBox.classList.remove('hidden');
-            updateCheckoutInstallmentPreview(); updateCheckoutMemberHint();
-        }
-        function getSelectedCheckoutPlan(){
-            const raw=document.getElementById('checkoutInstallmentPlan')?.value||''; const [unit,duration,installments]=raw.split(':');
-            if(!unit||!duration||!installments)return null; return {unit,duration:Number(duration),installments:Number(installments)};
-        }
-        function updateCheckoutInstallmentPreview(){
-            const el=document.getElementById('checkoutInstallmentPreview'); if(!el)return;
-            if(checkoutPaymentMode!=='installment'){el.innerHTML='';return;}
-            const total=cartTotalCents(cartLines()),plan=getSelectedCheckoutPlan();
-            if(!plan||!total){el.textContent='กรุณาเลือกแผนผ่อนค่ะ';return;}
-            const base=Math.floor(total/plan.installments),rem=total-base*plan.installments;
-            const first=base+(rem>0?1:0),last=base;
-            el.innerHTML=`ยอดเต็ม <b>${money(total)}</b><br>${plan.installments} งวด · ประมาณ <b>${money(first)}</b> / งวดแรก${rem>1?` และงวดอื่นประมาณ ${money(last)}`:''}`;
-        }
-        function updateCheckoutMemberHint(){
-            const el=document.getElementById('checkoutMemberHint'); if(!el)return;
-            if(checkoutPaymentMode!=='installment'){el.textContent='';return;}
-            el.innerHTML=auth?.currentUser?`เข้าสู่ระบบแล้ว: <b>${escapeHtml(auth.currentUser.email||'สมาชิก')}</b> ♡`:'การผ่อนต้องสมัครสมาชิกและเข้าสู่ระบบก่อนค่ะ';
+        function orderToken() {
+            const bytes=new Uint8Array(24); crypto.getRandomValues(bytes);
+            return [...bytes].map(byte=>byte.toString(16).padStart(2,'0')).join('');
         }
         async function createGuestOrder(event) {
             event.preventDefault();
@@ -5208,34 +5043,26 @@
             if(!lines.length || totalCents<=0 || totalCents>999999900) return showToast('กรุณาตรวจสอบยอดสินค้า');
             const stockError = cartAvailabilityMessage(lines);
             if (stockError) return showToast(stockError);
-            if(checkoutPaymentMode==='installment'){
-                if(!auth?.currentUser){ openMemberAuthModal('login'); return showToast('กรุณาสมัครสมาชิกหรือเข้าสู่ระบบก่อนเลือกผ่อนค่ะ','fa-user'); }
-                if(!checkoutInstallmentPlans.length)return showToast('สินค้าที่เลือกยังไม่มีแผนผ่อนที่ใช้ร่วมกันค่ะ');
-            }
             const button=document.getElementById('createOrderButton'); button.disabled=true;
             try {
-                const name=document.getElementById('checkoutName').value.trim(),contact=document.getElementById('checkoutContact').value.trim(),email=document.getElementById('checkoutEmail').value.trim(),note=document.getElementById('checkoutNote').value.trim();
-                if(checkoutPaymentMode==='installment'){
-                    const profileToken=await auth.currentUser.getIdToken();
-                    const profileResponse=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+profileToken},body:JSON.stringify({action:'customer-profile',name,phone:contact,email})});
-                    const profileResult=await profileResponse.json().catch(()=>({}));
-                    if(!profileResponse.ok||!profileResult.ok)throw new Error(profileResult.error||'บันทึกข้อมูลสมาชิกไม่สำเร็จค่ะ');
-                }
-                const payload={action:'create',paymentMode:checkoutPaymentMode,name,contact,email,note,items:lines.map(({product,qty})=>({productId:product.id,qty}))};
-                if(checkoutPaymentMode==='installment')payload.installmentPlan=getSelectedCheckoutPlan();
-                const headers={'Content-Type':'application/json'};
-                if(checkoutPaymentMode==='installment')headers.Authorization='Bearer '+await auth.currentUser.getIdToken();
-                const response=await fetch('/api/order',{method:'POST',headers,body:JSON.stringify(payload)});
+                const payload={
+                    action:'create',
+                    name:document.getElementById('checkoutName').value.trim(),
+                    contact:document.getElementById('checkoutContact').value.trim(),
+                    email:document.getElementById('checkoutEmail').value.trim(),
+                    note:document.getElementById('checkoutNote').value.trim(),
+                    items:lines.map(({product,qty})=>({productId:product.id,qty}))
+                };
+                const response=await fetch('/api/order',{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify(payload)
+                });
                 const result=await response.json().catch(()=>({}));
                 if(!response.ok || !result.ok) throw new Error(result.error||'สร้างออร์เดอร์ไม่สำเร็จค่ะ');
                 const token=result.token, orderNo=result.orderNo;
                 localStorage.setItem(LAST_ORDER_KEY,token);
                 guestCart=[];saveCart();closeCheckout();
-                if(checkoutPaymentMode==='installment'){
-                    showToast('สร้างรายการผ่อนแล้วค่ะ ♡ กรุณาเข้า “เช็คยอดผ่อนสินค้า” เพื่อชำระงวดแรก');
-                    renderInstallmentLookup();
-                    return;
-                }
                 document.getElementById('lookupOrderNo').value=orderNo;
                 document.getElementById('lookupAccessCode').value=token.slice(8).toUpperCase();
                 openOrderLookup(); await lookupGuestOrder();
