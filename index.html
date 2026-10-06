@@ -455,38 +455,33 @@
             overflow-x: auto; scrollbar-width: thin;
         }
         .shop-bottom-bar.shop-bottom-bar-hidden { display: none !important; }
-        .shop-admin-tools {
-            position: absolute; right: 5%; bottom: 92px; z-index: 111;
-            display: none; align-items: center; justify-content: flex-end; gap: 5px;
-            max-width: 90%;
-        }
-        .shop-admin-tools.admin-visible { display: flex; }
-        .shop-sales-button, .shop-activity-button, .shop-add-button {
-            position: static; min-height: 43px; padding: 0 11px; flex: 0 0 auto;
-            display: inline-flex; gap: 6px; align-items: center; justify-content: center;
+        .shop-sales-button, .shop-activity-button {
+            position: absolute; right: 5%; bottom: 92px; z-index: 110;
+            min-height: 43px; padding: 0 12px;
+            display: none; gap: 7px; align-items: center; justify-content: center;
             border-radius: 999px; border: 2px solid #fff;
-            background: #fff; color: #B94F9A; font-size: 11px; font-weight: 800;
+            background: #fff; color: #B94F9A; font-size: 12px; font-weight: 800;
             box-shadow: 0 7px 20px rgba(var(--theme-shadow-primary-rgb), .27);
             cursor: pointer;
         }
-        .shop-sales-button, .shop-activity-button { display: none; }
         .shop-sales-button.admin-visible, .shop-activity-button.admin-visible { display: inline-flex; }
-        .shop-add-button { display: inline-flex; }
-        .shop-admin-tools:not(.admin-visible) { display: none; }
-        .shop-sales-button i, .shop-activity-button i, .shop-add-button i { font-size: 13px; }
+        .shop-sales-button { right: calc(5% + 92px); }
+        .shop-activity-button { right: calc(5% + 184px); }
+        .shop-sales-button i, .shop-activity-button i { font-size: 14px; }
         @media (max-width: 430px) {
-            .shop-admin-tools { right: 3%; max-width: 94%; gap: 3px; }
-            .shop-sales-button, .shop-activity-button, .shop-add-button { padding: 0 8px; font-size: 10px; }
-            .shop-add-button span { max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .shop-sales-button, .shop-activity-button { bottom: 92px; padding: 0 9px; font-size: 10px; }
+            .shop-sales-button { right: calc(3% + 82px); }
+            .shop-activity-button { right: calc(3% + 164px); }
         }
-        @media (max-height: 500px) { .shop-admin-tools { bottom: 78px; } }
+        @media (max-height: 500px) {
+            .shop-sales-button, .shop-activity-button { bottom: 78px; }
+        }
         .sales-activity-banner {
             position: absolute; left: 5%; right: 5%; bottom: 145px; z-index: 112;
             display: none; align-items: center; gap: 10px; padding: 10px 12px;
             border: 1px solid #F8C8DC; border-radius: 18px; background: rgba(255,255,255,.96);
             box-shadow: 0 10px 28px rgba(var(--theme-shadow-primary-rgb), .20);
-            backdrop-filter: blur(12px); cursor: pointer;
-            transform: translateY(18px); opacity: 0;
+            backdrop-filter: blur(12px); cursor: pointer; transform: translateY(18px); opacity: 0;
         }
         .sales-activity-banner.show { display: flex; animation: salesBannerIn .35s ease forwards; }
         .sales-activity-banner.hide { display: flex; animation: salesBannerOut .3s ease forwards; }
@@ -498,7 +493,20 @@
         @keyframes salesBannerIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes salesBannerOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(18px); } }
         @media (max-height: 500px) { .sales-activity-banner { bottom: 125px; } }
-
+        .shop-add-button {
+            position: absolute; right: 5%; bottom: 92px; z-index: 110;
+            min-height: 43px; padding: 0 14px;
+            display: none; gap: 7px; align-items: center; justify-content: center;
+            border-radius: 999px; border: 2px solid #fff;
+            background: #fff; color: #B94F9A; font-size: 12px; font-weight: 800;
+            box-shadow: 0 7px 20px rgba(var(--theme-shadow-primary-rgb), .27);
+            cursor: pointer;
+        }
+        .shop-add-button.admin-visible { display: inline-flex; }
+        .shop-add-button i { font-size: 14px; }
+        @media (max-height: 500px) {
+            .shop-add-button { bottom: 78px; }
+        }
         .shop-nav-item {
             flex: 0 0 auto; min-width: 65px; display: flex; flex-direction: column;
             align-items: center; gap: 1px; border-radius: 17px;
@@ -1626,11 +1634,9 @@
                 <div class="home-indicator"></div>
             </div>
 
-            <div class="shop-admin-tools" id="shopAdminTools" aria-label="เครื่องมือแอดมิน">
-                <button type="button" class="shop-sales-button" id="shopSalesButton" onclick="openSalesDashboard()" aria-label="ดูยอดขายร้าน"><i class="fas fa-chart-line"></i><span>ยอดขาย</span></button>
-                <button type="button" class="shop-activity-button" id="shopActivityButton" onclick="showNextSalesActivity(true)" aria-label="ดูกิจกรรมล่าสุด"><i class="fas fa-sparkles"></i><span>กิจกรรม</span></button>
-                <button type="button" class="shop-add-button" id="shopAddButton" onclick="startAddProduct()" aria-label="เพิ่มสินค้าในระบบแอดมิน"><i class="fas fa-plus-circle"></i><span>เพิ่มสินค้า (แอดมิน)</span></button>
-            </div>
+            <button type="button" class="shop-add-button" id="shopAddButton" onclick="startAddProduct()" aria-label="เพิ่มสินค้าในระบบแอดมิน"><i class="fas fa-plus-circle"></i><span>เพิ่มสินค้า (แอดมิน)</span></button>
+            <button type="button" class="shop-sales-button" id="shopSalesButton" onclick="openSalesDashboard()" aria-label="ดูยอดขายร้าน"><i class="fas fa-chart-line"></i><span>ยอดขาย</span></button>
+            <button type="button" class="shop-activity-button" id="shopActivityButton" onclick="showNextSalesActivity(true)" aria-label="ดูกิจกรรมล่าสุด"><i class="fas fa-sparkles"></i><span>กิจกรรม</span></button>
             <div id="salesActivityBanner" class="sales-activity-banner" role="status" aria-live="polite"></div>
             <div id="salesDashboardModal" class="fixed inset-0 z-[9998] hidden items-center justify-center bg-black/40 p-4">
                 <div class="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl border border-[#F8C8DC] space-y-4">
@@ -5023,13 +5029,6 @@
         let salesActivityTimer = null;
         let salesActivityHideTimer = null;
 
-        function maskCustomerName(name) {
-            const chars = Array.from(String(name || '').trim());
-            if (!chars.length) return 'ลูกค้า';
-            if (chars.length <= 2) return chars.join('') + '*';
-            return chars.slice(0, 2).join('') + '*'.repeat(Math.max(2, chars.length - 2));
-        }
-
         function formatActivityAge(ms) {
             const seconds = Math.max(0, Math.floor(ms / 1000));
             if (seconds < 60) return 'เมื่อสักครู่นี้';
@@ -5037,19 +5036,18 @@
             if (minutes < 60) return `เมื่อ ${minutes} นาทีที่แล้ว`;
             const hours = Math.floor(minutes / 60);
             if (hours < 24) return `เมื่อ ${hours} ชั่วโมงที่แล้ว`;
-            const days = Math.floor(hours / 24);
-            return `เมื่อ ${days} วันที่แล้ว`;
+            return `เมื่อ ${Math.floor(hours / 24)} วันที่แล้ว`;
         }
 
         function renderSalesActivityBanner(item) {
             const banner = document.getElementById('salesActivityBanner');
             if (!banner || !item) return;
-            banner.classList.remove('show','hide');
+            banner.classList.remove('show', 'hide');
             void banner.offsetWidth;
             const age = item.createdAtMillis ? formatActivityAge(Date.now() - item.createdAtMillis) : 'เมื่อสักครู่นี้';
-            banner.innerHTML = `<div class="sales-activity-avatar"><i class="fas fa-shopping-bag"></i></div><div class="sales-activity-copy"><strong>🎀 ${escapeHtml(item.maskedName)} สั่งซื้อ ${escapeHtml(item.title)} แล้ว</strong><span>${escapeHtml(age)} • ขอบคุณที่อุดหนุน Pufforia 💕</span></div><button type="button" class="sales-activity-close" aria-label="ปิด">×</button>`;
-            banner.querySelector('.sales-activity-close').onclick = (event) => { event.stopPropagation(); hideSalesActivityBanner(); };
-            banner.onclick = () => { hideSalesActivityBanner(); };
+            banner.innerHTML = `<div class="sales-activity-avatar"><i class="fas fa-shopping-bag"></i></div><div class="sales-activity-copy"><strong>🎀 ${escapeHtml(item.maskedName || 'ลูกค้า')} สั่งซื้อ ${escapeHtml(item.title || 'สินค้า')} แล้ว</strong><span>${escapeHtml(age)} • ขอบคุณที่อุดหนุน Pufforia 💕</span></div><button type="button" class="sales-activity-close" aria-label="ปิด">×</button>`;
+            banner.querySelector('.sales-activity-close').onclick = event => { event.stopPropagation(); hideSalesActivityBanner(); };
+            banner.onclick = hideSalesActivityBanner;
             banner.classList.add('show');
             clearTimeout(salesActivityHideTimer);
             salesActivityHideTimer = setTimeout(hideSalesActivityBanner, 5200);
@@ -5058,7 +5056,8 @@
         function hideSalesActivityBanner() {
             const banner = document.getElementById('salesActivityBanner');
             if (!banner || !banner.classList.contains('show')) return;
-            banner.classList.remove('show'); banner.classList.add('hide');
+            banner.classList.remove('show');
+            banner.classList.add('hide');
             setTimeout(() => banner.classList.remove('hide'), 320);
         }
 
@@ -5074,19 +5073,21 @@
 
         async function loadSalesActivity() {
             try {
-                const response = await fetch('/api/order', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'recent-sales'})});
+                const response = await fetch('/api/order', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: 'recent-sales'})
+                });
                 const data = await response.json().catch(() => ({}));
                 if (!response.ok || !data.ok) throw new Error(data.error || 'โหลดกิจกรรมไม่สำเร็จ');
                 salesActivityItems = Array.isArray(data.recent) ? data.recent : [];
+                clearInterval(salesActivityTimer);
                 if (salesActivityItems.length) {
-                    clearInterval(salesActivityTimer);
                     salesActivityTimer = setInterval(() => showNextSalesActivity(false), 12000);
                     setTimeout(() => showNextSalesActivity(false), 3500);
                 }
-                return data;
             } catch (error) {
                 console.warn('Sales activity unavailable:', error);
-                return null;
             }
         }
 
@@ -5097,33 +5098,42 @@
             content.innerHTML = '<div class="col-span-2 text-center text-xs text-[#A38E94] py-4">กำลังโหลดข้อมูลยอดขาย...</div>';
             recent.innerHTML = '';
             try {
-                const response = await fetch('/api/order', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'recent-sales'})});
+                const response = await fetch('/api/order', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: 'recent-sales'})
+                });
                 const data = await response.json().catch(() => ({}));
                 if (!response.ok || !data.ok) throw new Error(data.error || 'โหลดยอดขายไม่สำเร็จ');
                 const stats = data.stats || {};
-                content.innerHTML = `<div class="rounded-2xl bg-[#FFF0F7] p-3"><p class="text-[10px] text-[#9A858B]">จำหน่ายแล้ว</p><p class="text-xl font-extrabold text-[#D870B8]">${Number(stats.soldItems || 0).toLocaleString()} ชิ้น</p></div><div class="rounded-2xl bg-[#EEF9FF] p-3"><p class="text-[10px] text-[#7C929D]">ยอดขายรวม</p><p class="text-xl font-extrabold text-[#397CA5]">฿${(Number(stats.totalCents || 0)/100).toLocaleString('th-TH',{minimumFractionDigits:2})}</p></div><div class="rounded-2xl bg-[#FFF9EC] p-3"><p class="text-[10px] text-[#9A858B]">ออร์เดอร์ที่ชำระแล้ว</p><p class="text-xl font-extrabold text-[#8B6F31]">${Number(stats.paidOrders || 0).toLocaleString()}</p></div><div class="rounded-2xl bg-[#F5F3FF] p-3"><p class="text-[10px] text-[#8F879D]">อัปเดต</p><p class="text-sm font-extrabold text-[#756D86]">ล่าสุด</p></div>`;
-                const recentItems = Array.isArray(data.recent) ? data.recent.slice(0,5) : [];
-                recent.innerHTML = recentItems.length ? recentItems.map(item => `<div class="flex items-center justify-between gap-2 border-b border-[#F8C8DC] pb-2"><span class="min-w-0 truncate"><b>${escapeHtml(item.maskedName)}</b> สั่ง ${escapeHtml(item.title)} × ${item.qty}</span><span class="shrink-0 font-bold text-[#D870B8]">฿${(Number(item.totalCents || 0)/100).toLocaleString('th-TH',{minimumFractionDigits:2})}</span></div>`).join('') : '<p class="text-[#A38E94]">ยังไม่มีออร์เดอร์ที่ยืนยันชำระเงินค่ะ</p>';
+                content.innerHTML = `<div class="rounded-2xl bg-[#FFF0F7] p-3"><p class="text-[10px] text-[#9A858B]">จำหน่ายแล้ว</p><p class="text-xl font-extrabold text-[#D870B8]">${Number(stats.soldItems || 0).toLocaleString()} ชิ้น</p></div><div class="rounded-2xl bg-[#EEF9FF] p-3"><p class="text-[10px] text-[#7C929D]">ยอดขายรวม</p><p class="text-xl font-extrabold text-[#397CA5]">฿${(Number(stats.totalCents || 0) / 100).toLocaleString('th-TH',{minimumFractionDigits:2})}</p></div><div class="rounded-2xl bg-[#FFF9EC] p-3"><p class="text-[10px] text-[#9A858B]">ออร์เดอร์ที่ชำระแล้ว</p><p class="text-xl font-extrabold text-[#8B6F31]">${Number(stats.paidOrders || 0).toLocaleString()}</p></div><div class="rounded-2xl bg-[#F5F3FF] p-3"><p class="text-[10px] text-[#8F879D]">สถานะ</p><p class="text-sm font-extrabold text-[#756D86]">อัปเดตล่าสุด</p></div>`;
+                const recentItems = Array.isArray(data.recent) ? data.recent.slice(0, 5) : [];
+                recent.innerHTML = recentItems.length
+                    ? recentItems.map(item => `<div class="flex items-center justify-between gap-2 border-b border-[#F8C8DC] pb-2"><span class="min-w-0 truncate"><b>${escapeHtml(item.maskedName || 'ลูกค้า')}</b> สั่ง ${escapeHtml(item.title || 'สินค้า')} × ${Number(item.qty || 0)}</span><span class="shrink-0 font-bold text-[#D870B8]">฿${(Number(item.totalCents || 0) / 100).toLocaleString('th-TH',{minimumFractionDigits:2})}</span></div>`).join('')
+                    : '<p class="text-[#A38E94]">ยังไม่มีออร์เดอร์ที่ยืนยันชำระเงินค่ะ</p>';
             } catch (error) {
                 content.innerHTML = `<div class="col-span-2 text-center text-xs text-rose-500 py-4">${escapeHtml(error.message || 'โหลดข้อมูลไม่สำเร็จค่ะ')}</div>`;
             }
         }
 
         function openSalesDashboard() {
+            if (!isAdminLoggedIn) return;
             const modal = document.getElementById('salesDashboardModal');
             if (!modal) return;
-            modal.classList.remove('hidden'); modal.classList.add('flex');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
             loadSalesDashboard();
         }
+
         function closeSalesDashboard() {
             const modal = document.getElementById('salesDashboardModal');
             if (!modal) return;
-            modal.classList.add('hidden'); modal.classList.remove('flex');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
         }
 
         function updateSalesFloatingButtons() {
-            const show = isAdminLoggedIn;
-            document.getElementById('shopAdminTools')?.classList.toggle('admin-visible', show);
+            const show = !!isAdminLoggedIn;
             document.getElementById('shopSalesButton')?.classList.toggle('admin-visible', show);
             document.getElementById('shopActivityButton')?.classList.toggle('admin-visible', show);
         }
