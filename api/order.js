@@ -1,17 +1,25 @@
 const crypto = require('crypto');
 const admin = require('firebase-admin');
 
+function ensureFirebaseAdmin() {
+  if (admin.apps.length) return;
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!raw) throw new Error('Missing FIREBASE_SERVICE_ACCOUNT_JSON');
+  const serviceAccount = JSON.parse(raw);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID
+  });
+}
+
 function getDb() {
-  if (!admin.apps.length) {
-    const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-    if (!raw) throw new Error('Missing FIREBASE_SERVICE_ACCOUNT_JSON');
-    const serviceAccount = JSON.parse(raw);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID
-    });
-  }
+  ensureFirebaseAdmin();
   return admin.firestore();
+}
+
+function getAuth() {
+  ensureFirebaseAdmin();
+  return admin.auth();
 }
 
 const ADMIN_UID = 'GqZRVXiadraaamU7mLaXamwOPBf2';
@@ -39,9 +47,56 @@ function validSlipImage(image) {
 async function requireAdmin(req) {
   const header = String(req.headers.authorization || '');
   if (!header.startsWith('Bearer ')) throw new Error('UNAUTHORIZED');
-  const decoded = await admin.auth().verifyIdToken(header.slice(7));
+  const decoded = await getAuth().verifyIdToken(header.slice(7));
   if (decoded.uid !== ADMIN_UID) throw new Error('FORBIDDEN');
   return decoded;
+}
+
+async function requireUser(req) {
+  const header = String(req.headers.authorization || '');
+  if (!header.startsWith('Bearer ')) throw new Error('UNAUTHORIZED');
+  return getAuth().verifyIdToken(header.slice(7));
+}
+
+function cleanPlan(plan) {
+  const unit = ['days','weeks','months'].includes(String(plan?.unit || '')) ? String(plan.unit) : '';
+  const duration = Number(plan?.duration);
+  const installments = Number(plan?.installments);
+  if (!unit || !Number.isInteger(duration) || duration < 1 || duration > 24 || !Number.isInteger(installments) || installments < 2 || installments > 60) return null;
+  return { unit, duration, installments };
+}
+
+function planKey(plan) {
+  const p = cleanPlan(plan);
+  return p ? `${p.unit}:${p.duration}:${p.installments}` : '';
+}
+
+function addPlanDate(date, unit, amount) {
+  const d = new Date(date.getTime());
+  if (unit === 'days') d.setDate(d.getDate() + amount);
+  else if (unit === 'weeks') d.setDate(d.getDate() + amount * 7);
+  else d.setMonth(d.getMonth() + amount);
+  return d;
+}
+
+function buildInstallmentSchedule(totalCents, plan) {
+  const p = cleanPlan(plan);
+  if (!p || !Number.isInteger(totalCents) || totalCents < 1) throw new Error('แผนผ่อนไม่ถูกต้อง');
+  const base = Math.floor(totalCents / p.installments);
+  const remainder = totalCents - base * p.installments;
+  const now = new Date();
+  return Array.from({ length: p.installments }, (_, index) => {
+    const step = (p.duration * (index + 1)) / p.installments;
+    let dueAt;
+    if (p.unit === 'months') {
+      const whole = Math.floor(step);
+      const extraDays = Math.round((step - whole) * 30);
+      dueAt = addPlanDate(addPlanDate(now, 'months', whole), 'days', extraDays);
+    } else {
+      dueAt = addPlanDate(now, p.unit, p.unit === 'weeks' ? Math.round(step) : Math.round(step));
+    }
+    return { number: index + 1, amountCents: base + (index < remainder ? 1 : 0), dueAt: dueAt.toISOString() };
+  });
 }
 
 async function getOrderWithDeliveries(token) {
@@ -57,7 +112,9 @@ function makeOrderToken() {
   return crypto.randomBytes(24).toString('hex');
 }
 
-async function createOrder(body) {
+async function createOrder(body, authUser = null) {
+  const paymentMode = body.paymentMode === 'installment' ? 'installment' : 'full';
+  if (paymentMode === 'installment' && !authUser) throw new Error('กรุณาเข้าสู่ระบบก่อนเลือกผ่อนสินค้า');
   const itemsInput = Array.isArray(body.items) ? body.items : [];
   if (!itemsInput.length || itemsInput.length > 20) throw new Error('รายการสินค้าไม่ถูกต้อง');
 
@@ -79,6 +136,8 @@ async function createOrder(body) {
   await db().runTransaction(async tx => {
     let totalCents = 0;
     const items = [];
+    let commonPlanKey = '';
+    let commonPlan = null;
 
     for (const line of normalized) {
       const productRef = db().collection('products_cakee').doc(line.productId);
@@ -88,6 +147,17 @@ async function createOrder(body) {
       const priceCents = Math.round(Number(product.priceBaht) * 100);
       if (!Number.isInteger(priceCents) || priceCents <= 0) throw new Error('ราคาสินค้าไม่ถูกต้อง');
       if (product.soldOut) throw new Error(`${product.title || 'สินค้า'} หมดชั่วคราวค่ะ`);
+      if (paymentMode === 'installment') {
+        if (product.installmentEnabled !== true) throw new Error(`${product.title || 'สินค้า'} ไม่เปิดให้ผ่อนค่ะ`);
+        const requestedPlan = cleanPlan(body.installmentPlan);
+        const allowed = Array.isArray(product.installmentPlans) ? product.installmentPlans : [];
+        const match = allowed.find(x => planKey(x) === planKey(requestedPlan));
+        if (!match) throw new Error(`${product.title || 'สินค้า'} ไม่รองรับแผนผ่อนที่เลือกค่ะ`);
+        const key = planKey(match);
+        if (commonPlanKey && commonPlanKey !== key) throw new Error('สินค้าที่เลือกผ่อนต้องใช้แผนผ่อนเดียวกันค่ะ');
+        commonPlanKey = key;
+        commonPlan = cleanPlan(match);
+      }
       if (product.deliveryType === 'code') {
         const stock = Number(product.stockCount);
         if (!Number.isInteger(stock) || stock < line.qty) {
@@ -105,6 +175,8 @@ async function createOrder(body) {
       });
     }
 
+    const installmentPlan = paymentMode === 'installment' ? commonPlan : null;
+    const installmentSchedule = installmentPlan ? buildInstallmentSchedule(totalCents, installmentPlan) : [];
     const order = {
       orderNo: 'AM-' + token.slice(0, 8).toUpperCase(),
       name: clean(body.name, 120),
@@ -113,7 +185,19 @@ async function createOrder(body) {
       note: clean(body.note, 1000),
       items,
       totalCents,
-      status: 'awaiting_slip',
+      paymentMode,
+      customerUid: paymentMode === 'installment' ? authUser.uid : '',
+      status: paymentMode === 'installment' ? 'installment_active' : 'awaiting_slip',
+      ...(installmentPlan ? {
+        installment: {
+          plan: installmentPlan,
+          schedule: installmentSchedule,
+          currentInstallment: 1,
+          paidInstallments: 0,
+          paidCents: 0,
+          remainingCents: totalCents
+        }
+      } : {}),
       createdAt: FieldValue.serverTimestamp()
     };
     tx.create(orderRef, order);
@@ -123,12 +207,12 @@ async function createOrder(body) {
   return result;
 }
 
-async function verifyEasySlip(image, order) {
+async function verifyEasySlip(image, order, expectedCents = order.totalCents) {
   const apiKey = String(process.env.EASYSLIP_API_KEY || '').trim();
   if (!apiKey) throw new Error('EASYSLIP_NOT_CONFIGURED');
 
   const matchAccount = String(process.env.EASYSLIP_MATCH_ACCOUNT || '').toLowerCase() === 'true';
-  const amountBaht = Number(order.totalCents) / 100;
+  const amountBaht = Number(expectedCents) / 100;
   const payload = {
     base64: image,
     remark: clean(order.orderNo || '', 255),
@@ -167,7 +251,7 @@ async function verifyEasySlip(image, order) {
     throw error;
   }
   if (!amountMatched) {
-    const error = new Error(`ยอดในสลิปไม่ตรงกับยอดออร์เดอร์ค่ะ (${Number.isFinite(amountInSlip) ? amountInSlip.toFixed(2) : '-'} บาท)`);
+    const error = new Error(`ยอดในสลิปไม่ตรงกับยอดที่ต้องชำระค่ะ (${Number.isFinite(amountInSlip) ? amountInSlip.toFixed(2) : '-'} บาท)`);
     error.code = 'AMOUNT_MISMATCH';
     throw error;
   }
@@ -265,80 +349,69 @@ async function submitSlip(body) {
 }
 
 
-
-async function requireCustomer(req) {
-  const header = String(req.headers.authorization || '');
-  if (!header.startsWith('Bearer ')) throw new Error('UNAUTHORIZED');
-  return admin.auth().verifyIdToken(header.slice(7));
-}
-
-function serializeFirestore(value) {
-  if (value && typeof value.toDate === 'function') return value.toDate().toISOString();
-  if (Array.isArray(value)) return value.map(serializeFirestore);
-  if (value && typeof value === 'object') {
-    const out = {};
-    for (const [key, item] of Object.entries(value)) out[key] = serializeFirestore(item);
-    return out;
-  }
-  return value;
-}
-
-async function getInstallmentOrderToken(data) {
-  return clean(
-    data.orderToken || data.orderId || data.token || data.order?.token || '',
-    100
-  );
-}
-
-async function findOrderForInstallment(data) {
-  const token = await getInstallmentOrderToken(data);
-  if (validToken(token)) {
-    const order = await getOrderWithDeliveries(token);
-    if (order) return order;
-  }
-
-  const orderNo = clean(data.orderNo || data.order?.orderNo || '', 100);
-  if (orderNo) {
-    const snap = await db().collection('orders_cakee')
-      .where('orderNo', '==', orderNo)
-      .limit(1)
-      .get();
-    if (!snap.empty) {
-      return getOrderWithDeliveries(snap.docs[0].id);
+async function submitInstallmentSlip(body, user) {
+  const token = clean(body.token, 100);
+  if (!validToken(token)) throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
+  const image = String(body.image || '');
+  if (!validSlipImage(image)) throw new Error('ไฟล์สลิปต้องเป็น JPG, PNG หรือ WebP และมีขนาดไม่เกิน 700 KB');
+  const order = await getOrderWithDeliveries(token);
+  if (!order || order.customerUid !== user.uid || order.paymentMode !== 'installment') throw new Error('ไม่พบรายการผ่อนของบัญชีนี้ค่ะ');
+  if (order.status === 'paid') throw new Error('รายการนี้ชำระครบแล้วค่ะ');
+  const installment = order.installment || {};
+  const schedule = Array.isArray(installment.schedule) ? installment.schedule : [];
+  const currentNo = Number(installment.currentInstallment || 1);
+  const current = schedule.find(x => Number(x.number) === currentNo);
+  if (!current) throw new Error('ไม่พบงวดที่ต้องชำระค่ะ');
+  const verification = await verifyEasySlip(image, order, Number(current.amountCents));
+  const paymentId = crypto.randomBytes(12).toString('hex');
+  const paymentRef = db().collection('installment_payments_cakee').doc(paymentId);
+  const orderRef = db().collection('orders_cakee').doc(token);
+  let finalPayment = false;
+  await db().runTransaction(async tx => {
+    const snap = await tx.get(orderRef);
+    if (!snap.exists) throw new Error('ไม่พบออร์เดอร์ค่ะ');
+    const fresh = snap.data() || {};
+    if (fresh.customerUid !== user.uid || fresh.paymentMode !== 'installment') throw new Error('ไม่พบรายการผ่อนของบัญชีนี้ค่ะ');
+    const inst = fresh.installment || {};
+    if (Number(inst.currentInstallment || 1) !== currentNo) throw new Error('งวดผ่อนมีการเปลี่ยนแปลง กรุณารีเฟรชหน้าแล้วลองใหม่ค่ะ');
+    const paidCents = Number(inst.paidCents || 0) + Number(current.amountCents);
+    const remainingCents = Math.max(0, Number(fresh.totalCents || 0) - paidCents);
+    finalPayment = remainingCents === 0 || currentNo >= schedule.length;
+    tx.create(paymentRef, {
+      orderToken: token, customerUid: user.uid, installmentNo: currentNo, amountCents: Number(current.amountCents),
+      image, imageHost: 'base64', verificationStatus: 'verified', easySlipData: verification.data || null, createdAt: FieldValue.serverTimestamp()
+    });
+    tx.update(orderRef, {
+      status: finalPayment ? 'submitted' : 'installment_active',
+      installment: { ...inst, paidInstallments: currentNo, currentInstallment: finalPayment ? currentNo : currentNo + 1, paidCents, remainingCents },
+      lastInstallmentPaymentAt: FieldValue.serverTimestamp()
+    });
+    if (finalPayment) tx.set(db().collection('order_slips_cakee').doc(token), { image, imageHost:'base64', submittedAt:FieldValue.serverTimestamp(), verificationStatus:'verified', verificationCode:'', verificationMessage:verification.message, easySlipData:verification.data || null });
+  });
+  if (finalPayment) {
+    try {
+      await adminApprove(token);
+      return { ok:true, verified:true, final:true, message:'งวดสุดท้ายผ่านแล้วค่ะ ชำระครบและยืนยันออร์เดอร์เรียบร้อยแล้ว' };
+    } catch (e) {
+      console.error('Final installment verified but fulfillment failed', e);
+      return { ok:true, verified:true, final:true, manualReview:true, message:'งวดสุดท้ายผ่านแล้วค่ะ แต่ระบบส่งมอบอัตโนมัติไม่สำเร็จ กรุณาให้แอดมินตรวจออร์เดอร์ค่ะ' };
     }
   }
-  return null;
+  return { ok:true, verified:true, final:false, message:`ชำระงวดที่ ${currentNo} สำเร็จค่ะ เหลือ ${schedule.length-currentNo} งวด` };
 }
 
-async function customerInstallmentList(req) {
-  const decoded = await requireCustomer(req);
-  const snap = await db().collection('installments_cakee')
-    .where('uid', '==', decoded.uid)
-    .limit(200)
-    .get();
-
-  return snap.docs.map(doc => serializeFirestore({ id: doc.id, ...doc.data() }));
+async function saveCustomerProfile(body, user) {
+  const name = clean(body.name, 120);
+  const phone = clean(body.phone, 40);
+  const email = clean(body.email || user.email || '', 200);
+  if (!name || !phone) throw new Error('กรุณากรอกชื่อและเบอร์โทรศัพท์ให้ครบค่ะ');
+  await db().collection('customers_cakee').doc(user.uid).set({ name, phone, email, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  return { ok: true };
 }
 
-async function customerInstallmentDetail(req, body) {
-  const decoded = await requireCustomer(req);
-  const id = clean(body.installmentId || body.id, 200);
-  if (!id) throw new Error('ไม่พบรหัสรายการผ่อนค่ะ');
-
-  const ref = db().collection('installments_cakee').doc(id);
-  const snap = await ref.get();
-  if (!snap.exists) throw new Error('ไม่พบรายการผ่อนค่ะ');
-
-  const installment = snap.data() || {};
-  if (String(installment.uid || '') !== String(decoded.uid)) {
-    throw new Error('ไม่มีสิทธิ์ดูรายการผ่อนนี้ค่ะ');
-  }
-
-  const order = await findOrderForInstallment(installment);
-  return {
-    installment: serializeFirestore({ id: snap.id, ...installment }),
-    order: order ? serializeFirestore(order) : null
-  };
+async function customerInstallments(user) {
+  const snap = await db().collection('orders_cakee').where('customerUid', '==', user.uid).where('paymentMode', '==', 'installment').limit(50).get();
+  return snap.docs.map(d => ({ id:d.id, ...d.data() }));
 }
 
 async function adminList() {
@@ -534,13 +607,65 @@ async function adminComplete(id, completed) {
   return { ok: true };
 }
 
+
+async function requireUser(req) {
+  const header = String(req.headers.authorization || '');
+  if (!header.startsWith('Bearer ')) throw new Error('UNAUTHORIZED');
+  const token = header.slice(7).trim();
+  if (!token) throw new Error('UNAUTHORIZED');
+  return await getAuth().verifyIdToken(token);
+}
+
+async function findOrderForInstallment(inst) {
+  const candidates = [inst.orderToken, inst.orderId, inst.token]
+    .map(v => clean(v, 100))
+    .filter(validToken);
+
+  for (const token of candidates) {
+    const order = await getOrderWithDeliveries(token);
+    if (order) return order;
+  }
+
+  const orderNo = clean(inst.orderNo, 100);
+  if (orderNo) {
+    const snap = await db().collection('orders_cakee')
+      .where('orderNo', '==', orderNo).limit(1).get();
+    if (!snap.empty) return await getOrderWithDeliveries(snap.docs[0].id);
+  }
+  return null;
+}
+
+async function installmentList(req) {
+  const user = await requireUser(req);
+  const snap = await db().collection('installments_cakee')
+    .where('uid', '==', user.uid).get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function installmentDetail(req, id) {
+  const user = await requireUser(req);
+  if (!id) throw new Error('ไม่พบรายการผ่อนค่ะ');
+  const snap = await db().collection('installments_cakee').doc(id).get();
+  if (!snap.exists) throw new Error('ไม่พบรายการผ่อนค่ะ');
+  const inst = snap.data() || {};
+  if (String(inst.uid || '') !== String(user.uid)) {
+    throw new Error('ไม่มีสิทธิ์ดูรายการผ่อนนี้ค่ะ');
+  }
+  const order = await findOrderForInstallment(inst);
+  return { installment: { id: snap.id, ...inst }, order };
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return send(res, 405, { ok: false, error: 'Method not allowed' });
   try {
     const body = req.body || {};
     const action = clean(body.action, 50);
 
-    if (action === 'create') return send(res, 200, { ok: true, ...(await createOrder(body)) });
+    if (action === 'create') {
+      let user = null;
+      if (body.paymentMode === 'installment') user = await requireUser(req);
+      return send(res, 200, { ok: true, ...(await createOrder(body, user)) });
+    }
     if (action === 'lookup') {
       const token = clean(body.token, 100);
       if (!validToken(token)) return send(res, 400, { ok: false, error: 'รหัสออร์เดอร์ไม่ถูกต้อง' });
@@ -549,8 +674,21 @@ module.exports = async (req, res) => {
       return send(res, 200, { ok: true, order });
     }
     if (action === 'submit-slip') return send(res, 200, await submitSlip(body));
-    if (action === 'installment-list') return send(res, 200, { ok: true, installments: await customerInstallmentList(req) });
-    if (action === 'installment-detail') return send(res, 200, { ok: true, ...(await customerInstallmentDetail(req, body)) });
+    if (action === 'installment-submit-slip') {
+      const user = await requireUser(req);
+      return send(res, 200, await submitInstallmentSlip(body, user));
+    }
+    if (action === 'installment-list') {
+      const user = await requireUser(req);
+      return send(res, 200, { ok:true, installments:await customerInstallments(user) });
+    }
+    if (action === 'customer-profile') {
+      const user = await requireUser(req);
+      return send(res, 200, await saveCustomerProfile(body, user));
+    }
+
+    if (action === 'installment-list') return send(res, 200, { ok: true, installments: await installmentList(req) });
+    if (action === 'installment-detail') return send(res, 200, { ok: true, ...(await installmentDetail(req, clean(body.id, 200))) });
 
     await requireAdmin(req);
     if (action === 'admin-list') return send(res, 200, { ok: true, orders: await adminList() });
