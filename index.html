@@ -1068,6 +1068,35 @@
         </div>
     </div>
 
+    <!-- Unified Customer/Admin Account Modal -->
+    <div class="modal-overlay" id="accountModal" onclick="if(event.target===this)closeAccountModal()">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-sm font-bold text-[#7A6669]"><i class="fas fa-user-circle text-[#D870B8] mr-1"></i> บัญชีของฉัน</h3>
+                <button type="button" onclick="closeAccountModal()" class="w-7 h-7 rounded-full bg-[#FFF5FB] text-[#D870B8] flex items-center justify-center text-xs font-bold border border-[#F8C8DC]">✕</button>
+            </div>
+            <div id="accountGuestBox">
+                <p class="text-xs text-[#A89599] mb-3">เข้าสู่ระบบเพื่อดูประวัติการสั่งซื้อ รายการผ่อน และสถานะสินค้าของคุณค่ะ</p>
+                <button type="button" onclick="openCustomerAuthFromAccount('login')" class="w-full bg-[#D870B8] text-white font-bold py-3 rounded-xl text-sm">เข้าสู่ระบบ / สมัครสมาชิก</button>
+                <button type="button" onclick="openAdminLoginFromAccount()" class="w-full mt-2 bg-white text-[#D870B8] border border-[#F8C8DC] font-bold py-2.5 rounded-xl text-xs">เข้าสู่ระบบแอดมิน</button>
+            </div>
+            <div id="accountUserBox" class="hidden">
+                <div class="rounded-2xl bg-[#FFF5FB] border border-[#F8C8DC] p-3 mb-3">
+                    <div class="text-[10px] opacity-60">บัญชีที่เข้าสู่ระบบ</div>
+                    <div id="accountUserEmail" class="font-extrabold text-sm mt-1"></div>
+                    <div id="accountUserRole" class="text-[10px] text-[#D870B8] mt-1"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <button type="button" onclick="openAccountOrders()" class="bg-white border border-[#F8C8DC] rounded-2xl p-3 text-left"><i class="fas fa-shopping-bag text-[#D870B8]"></i><b class="block text-xs mt-1">ประวัติการสั่งซื้อ</b><span class="text-[9px] opacity-60">ออเดอร์และสินค้าที่เคยซื้อ</span></button>
+                    <button type="button" onclick="openAccountInstallments()" class="bg-white border border-[#F8C8DC] rounded-2xl p-3 text-left"><i class="fas fa-wallet text-[#D870B8]"></i><b class="block text-xs mt-1">รายการผ่อนของฉัน</b><span class="text-[9px] opacity-60">ยอดคงเหลือและงวด</span></button>
+                </div>
+                <button id="accountAdminButton" type="button" onclick="openAdminPanelFromAccount()" class="hidden w-full bg-[#F6FBFF] text-[#397CA5] border border-[#B7DFF2] rounded-xl py-2.5 text-xs font-bold mb-2">⚙️ จัดการระบบหลังบ้าน</button>
+                <button type="button" onclick="logoutFromUnifiedAccount()" class="w-full bg-rose-50 text-rose-500 border border-rose-200 rounded-xl py-2.5 text-xs font-bold">🚪 ออกจากระบบ</button>
+                <div id="accountResult" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Admin Login Modal -->
     <div class="modal-overlay" id="adminLoginModal">
         <div class="modal-content">
@@ -1091,7 +1120,7 @@
     <div class="modal-overlay" id="customerAuthModal" onclick="if(event.target===this)closeCustomerAuthModal()">
         <div class="modal-content">
             <div class="flex justify-between items-center mb-3">
-                <h3 class="text-sm font-bold text-[#7A6669]"><i class="fas fa-user-circle text-[#D870B8] mr-1"></i> สมาชิกสำหรับผ่อนสินค้า</h3>
+                <h3 class="text-sm font-bold text-[#7A6669]"><i class="fas fa-user-circle text-[#D870B8] mr-1"></i> บัญชีสมาชิก</h3>
                 <button type="button" onclick="closeCustomerAuthModal()" class="w-7 h-7 rounded-full bg-[#FFF5FB] text-[#D870B8] flex items-center justify-center text-xs font-bold border border-[#F8C8DC]">✕</button>
             </div>
             <p id="customerAuthHint" class="text-xs text-[#A89599] mb-3">ต้องเข้าสู่ระบบก่อนเลือกผ่อนสินค้า เพื่อผูกยอดผ่อนกับบัญชีของคุณค่ะ</p>
@@ -1703,8 +1732,8 @@
                     </button>
                     <button class="mini-music-btn" onclick="openOrderLookup()" title="ค้นหาออร์เดอร์" aria-label="ค้นหาออร์เดอร์"><i class="fas fa-receipt text-[11px]"></i></button>
                     <button class="mini-music-btn relative" onclick="openCart()" title="ตะกร้าสินค้า" aria-label="ตะกร้าสินค้า"><i class="fas fa-shopping-bag text-[11px]"></i><span id="cartCount" class="absolute -top-2 -right-2 bg-[#D870B8] text-white rounded-full px-1 text-[9px]">0</span></button>
-                    <button class="admin-lock-btn" id="adminLockBtn" onclick="handleAdminBtnClick()" title="ระบบแอดมิน">
-                        <i class="fas fa-lock text-[11px]" id="adminLockIcon"></i>
+                    <button class="admin-lock-btn" id="adminLockBtn" onclick="handleUnifiedAccountClick()" title="บัญชีของฉัน">
+                        <i class="fas fa-user text-[11px]" id="adminLockIcon"></i>
                     </button>
                     <i class="fas fa-wifi text-[#D870B8]"></i>
                     <i class="fas fa-battery-full text-sm text-[#D870B8]"></i>
@@ -3872,6 +3901,45 @@
             else { openAdminLoginModal(); }
         }
 
+        function handleUnifiedAccountClick(){
+            if(auth?.currentUser){ openAccountModal(); } else { openAccountModal(); }
+        }
+        function openAccountModal(){
+            const u=auth?.currentUser||null;
+            document.getElementById('accountGuestBox')?.classList.toggle('hidden',!!u);
+            document.getElementById('accountUserBox')?.classList.toggle('hidden',!u);
+            if(u){
+                const email=document.getElementById('accountUserEmail'); if(email) email.textContent=u.email||'สมาชิก';
+                const role=document.getElementById('accountUserRole'); const admin=u.uid===ADMIN_UID; if(role) role.textContent=admin?'บัญชีแอดมิน':'บัญชีสมาชิก';
+                document.getElementById('accountAdminButton')?.classList.toggle('hidden',!admin);
+            }
+            document.getElementById('accountResult')?.replaceChildren();
+            document.getElementById('accountModal')?.classList.add('active');
+        }
+        function closeAccountModal(){document.getElementById('accountModal')?.classList.remove('active');}
+        function openCustomerAuthFromAccount(mode='login'){closeAccountModal();openCustomerAuthModal(mode);}
+        function openAdminLoginFromAccount(){closeAccountModal();openAdminLoginModal();}
+        function openAdminPanelFromAccount(){closeAccountModal();openAdminPanelModal();}
+        async function logoutFromUnifiedAccount(){
+            if(!auth?.currentUser)return;
+            const admin=auth.currentUser.uid===ADMIN_UID;
+            try{await auth.signOut();isAdminLoggedIn=false;updateAdminLockIcon();closeAccountModal();closeAdminPanelModal();showToast(admin?'ออกจากระบบแอดมินแล้ว':'ออกจากระบบสมาชิกแล้ว');}
+            catch(e){console.error(e);showToast('ออกจากระบบไม่สำเร็จค่ะ','fa-times-circle');}
+        }
+        async function openAccountOrders(){
+            const box=document.getElementById('accountResult'); if(!box)return;
+            if(!auth?.currentUser)return openCustomerAuthFromAccount('login');
+            box.innerHTML='<div class="tracking-card text-center text-xs">กำลังโหลดประวัติการสั่งซื้อ... ♡</div>';
+            try{
+                const token=await auth.currentUser.getIdToken(true);
+                const r=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({action:'customer-orders'})});
+                const d=await r.json().catch(()=>({})); if(!r.ok||!d.ok)throw new Error(d.error||'โหลดประวัติการสั่งซื้อไม่สำเร็จค่ะ');
+                if(!d.orders?.length){box.innerHTML='<div class="tracking-card text-center text-xs">ยังไม่มีออเดอร์ที่ผูกกับบัญชีนี้ค่ะ<br><span class="opacity-60">ออเดอร์เก่าที่สั่งก่อนสมัครสมาชิกอาจไม่แสดงค่ะ</span></div>';return;}
+                box.innerHTML=d.orders.map(o=>{const items=(o.items||[]).map(x=>`${escapeHtml(x.title||'สินค้า')} × ${x.qty}`).join('<br>');const status=o.status==='paid'?'ชำระแล้ว':o.status==='installment_active'?'กำลังผ่อน':o.status==='completed'?'เสร็จสิ้น':o.status||'รอดำเนินการ';return `<div class="tracking-card mb-2"><div class="flex justify-between gap-2"><b class="text-xs">${escapeHtml(o.orderNo||'-')}</b><span class="text-[9px] px-2 py-1 rounded-full bg-[#FFF5FB] text-[#D870B8]">${escapeHtml(status)}</span></div><div class="text-[10px] mt-2">${items||'-'}</div><div class="text-xs font-bold mt-2">${money(Number(o.totalCents||0))}</div></div>`;}).join('');
+            }catch(e){box.innerHTML='<div class="tracking-card text-center text-xs text-rose-500">'+escapeHtml(e.message||'เกิดข้อผิดพลาดค่ะ')+'</div>';}
+        }
+        function openAccountInstallments(){closeAccountModal();openCheckQSubpage('installment');}
+
         function openAdminLoginModal() {
             document.getElementById('adminPasswordInput').value = '';
             document.getElementById('adminLoginModal').classList.add('active');
@@ -4038,10 +4106,10 @@
             document.getElementById('shopAddButton')?.classList.toggle('admin-visible', isAdminLoggedIn);
             if (isAdminLoggedIn) {
                 btn.classList.add('logged-in');
-                icon.className = "fas fa-lock-open text-[11px]";
+                icon.className = "fas fa-user-check text-[11px]";
             } else {
                 btn.classList.remove('logged-in');
-                icon.className = "fas fa-lock text-[11px]";
+                icon.className = "fas fa-user text-[11px]";
             }
         }
 
@@ -5388,7 +5456,7 @@
                     payload.installmentPlan=plan;
                 }
                 const headers={'Content-Type':'application/json'};
-                if(checkoutPaymentMode==='installment') headers.Authorization='Bearer '+await authUser.getIdToken(true);
+                if(authUser) headers.Authorization='Bearer '+await authUser.getIdToken(true);
                 const response=await fetch('/api/order',{method:'POST',headers,body:JSON.stringify(payload)});
                 const result=await response.json().catch(()=>({}));
                 if(!response.ok||!result.ok)throw new Error(result.error||'สร้างออร์เดอร์ไม่สำเร็จค่ะ');
