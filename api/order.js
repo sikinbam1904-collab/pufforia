@@ -39,6 +39,11 @@ function validSlipImage(image) {
 async function requireAdmin(req) {
   const header = String(req.headers.authorization || '');
   if (!header.startsWith('Bearer ')) throw new Error('UNAUTHORIZED');
+
+  // Make sure the DEFAULT Firebase Admin app exists before calling admin.auth().
+  // Otherwise Firebase Admin can throw: "The default Firebase app does not exist."
+  getDb();
+
   const decoded = await admin.auth().verifyIdToken(header.slice(7));
   if (decoded.uid !== ADMIN_UID) throw new Error('FORBIDDEN');
   return decoded;
@@ -59,17 +64,17 @@ function makeOrderToken() {
 
 async function createOrder(body) {
   const itemsInput = Array.isArray(body.items) ? body.items : [];
-  if (!itemsInput.length || itemsInput.length > 20) throw new Error('à¸£à¸²à¸¢à¸à¸²à¸£à¸ªà¸´à¸à¸à¹à¸²à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+  if (!itemsInput.length || itemsInput.length > 20) throw new Error('รายการสินค้าไม่ถูกต้อง');
 
   const normalized = itemsInput.map(item => ({
     productId: clean(item.productId, 200),
     qty: Number(item.qty)
   }));
   if (normalized.some(x => !x.productId || !Number.isInteger(x.qty) || x.qty < 1 || x.qty > 20)) {
-    throw new Error('à¸à¸³à¸à¸§à¸à¸ªà¸´à¸à¸à¹à¸²à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+    throw new Error('จำนวนสินค้าไม่ถูกต้อง');
   }
   if (new Set(normalized.map(x => x.productId)).size !== normalized.length) {
-    throw new Error('à¸à¸à¸ªà¸´à¸à¸à¹à¸²à¸à¹à¸³à¹à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹');
+    throw new Error('พบสินค้าซ้ำในออร์เดอร์');
   }
 
   const token = makeOrderToken();
@@ -83,22 +88,22 @@ async function createOrder(body) {
     for (const line of normalized) {
       const productRef = db().collection('products_cakee').doc(line.productId);
       const snap = await tx.get(productRef);
-      if (!snap.exists) throw new Error('à¹à¸¡à¹à¸à¸à¸ªà¸´à¸à¸à¹à¸²');
+      if (!snap.exists) throw new Error('ไม่พบสินค้า');
       const product = snap.data() || {};
       const priceCents = Math.round(Number(product.priceBaht) * 100);
-      if (!Number.isInteger(priceCents) || priceCents <= 0) throw new Error('à¸£à¸²à¸à¸²à¸ªà¸´à¸à¸à¹à¸²à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
-      if (product.soldOut) throw new Error(`${product.title || 'à¸ªà¸´à¸à¸à¹à¸²'} à¸«à¸¡à¸à¸à¸±à¹à¸§à¸à¸£à¸²à¸§à¸à¹à¸°`);
+      if (!Number.isInteger(priceCents) || priceCents <= 0) throw new Error('ราคาสินค้าไม่ถูกต้อง');
+      if (product.soldOut) throw new Error(`${product.title || 'สินค้า'} หมดชั่วคราวค่ะ`);
       if (product.deliveryType === 'code') {
         const stock = Number(product.stockCount);
         if (!Number.isInteger(stock) || stock < line.qty) {
-          throw new Error(`${product.title || 'à¸ªà¸´à¸à¸à¹à¸²'} à¹à¸«à¸¥à¸·à¸­à¸ªà¸´à¸à¸à¹à¸² ${Number.isInteger(stock) ? stock : 0} à¸à¸´à¹à¸à¸à¹à¸°`);
+          throw new Error(`${product.title || 'สินค้า'} เหลือสินค้า ${Number.isInteger(stock) ? stock : 0} ชิ้นค่ะ`);
         }
       }
       totalCents += priceCents * line.qty;
-      if (totalCents > 999999900) throw new Error('à¸¢à¸­à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸ªà¸¹à¸à¹à¸à¸´à¸à¸à¸³à¸«à¸à¸');
+      if (totalCents > 999999900) throw new Error('ยอดออร์เดอร์สูงเกินกำหนด');
       items.push({
         productId: line.productId,
-        title: clean(product.title || 'à¸ªà¸´à¸à¸à¹à¸²', 120),
+        title: clean(product.title || 'สินค้า', 120),
         qty: line.qty,
         priceCents,
         deliveryType: product.deliveryType || 'custom'
@@ -149,7 +154,7 @@ async function verifyEasySlip(image, order) {
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.success) {
     const code = result?.error?.code || `HTTP_${response.status}`;
-    const message = result?.error?.message || 'EasySlip à¸à¸£à¸§à¸à¸ªà¸¥à¸´à¸à¹à¸¡à¹à¸ªà¸³à¹à¸£à¹à¸';
+    const message = result?.error?.message || 'EasySlip ตรวจสลิปไม่สำเร็จ';
     const error = new Error(message);
     error.code = code;
     throw error;
@@ -162,17 +167,17 @@ async function verifyEasySlip(image, order) {
   const accountMatched = !matchAccount || data.matchedAccount != null;
 
   if (data.isDuplicate === true) {
-    const error = new Error('à¸ªà¸¥à¸´à¸à¸à¸µà¹à¹à¸à¸¢à¸à¸¹à¸à¸à¸£à¸§à¸à¸ªà¸­à¸à¹à¸¥à¹à¸§à¸à¹à¸°');
+    const error = new Error('สลิปนี้เคยถูกตรวจสอบแล้วค่ะ');
     error.code = 'DUPLICATE_SLIP';
     throw error;
   }
   if (!amountMatched) {
-    const error = new Error(`à¸¢à¸­à¸à¹à¸à¸ªà¸¥à¸´à¸à¹à¸¡à¹à¸à¸£à¸à¸à¸±à¸à¸¢à¸­à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¹à¸° (${Number.isFinite(amountInSlip) ? amountInSlip.toFixed(2) : '-'} à¸à¸²à¸)`);
+    const error = new Error(`ยอดในสลิปไม่ตรงกับยอดออร์เดอร์ค่ะ (${Number.isFinite(amountInSlip) ? amountInSlip.toFixed(2) : '-'} บาท)`);
     error.code = 'AMOUNT_MISMATCH';
     throw error;
   }
   if (!accountMatched) {
-    const error = new Error('à¸à¸±à¸à¸à¸µà¸à¸¹à¹à¸£à¸±à¸à¹à¸à¸ªà¸¥à¸´à¸à¹à¸¡à¹à¸à¸£à¸à¸à¸±à¸à¸à¸±à¸à¸à¸µà¸£à¹à¸²à¸à¸à¸µà¹à¸¥à¸à¸à¸°à¹à¸à¸µà¸¢à¸à¸à¸±à¸ EasySlip à¸à¹à¸°');
+    const error = new Error('บัญชีผู้รับในสลิปไม่ตรงกับบัญชีร้านที่ลงทะเบียนกับ EasySlip ค่ะ');
     error.code = 'ACCOUNT_MISMATCH';
     throw error;
   }
@@ -188,9 +193,9 @@ async function saveSubmittedSlip(token, image, verification = {}) {
   const slipRef = db().collection('order_slips_cakee').doc(token);
   await db().runTransaction(async tx => {
     const snap = await tx.get(orderRef);
-    if (!snap.exists) throw new Error('à¹à¸¡à¹à¸à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¹à¸°');
+    if (!snap.exists) throw new Error('ไม่พบออร์เดอร์ค่ะ');
     const order = snap.data() || {};
-    if (!['awaiting_slip', 'rejected'].includes(order.status)) throw new Error('à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¸µà¹à¹à¸¡à¹à¸ªà¸²à¸¡à¸²à¸£à¸à¸ªà¹à¸à¸ªà¸¥à¸´à¸à¸à¹à¸³à¹à¸à¹');
+    if (!['awaiting_slip', 'rejected'].includes(order.status)) throw new Error('ออร์เดอร์นี้ไม่สามารถส่งสลิปซ้ำได้');
     tx.set(slipRef, {
       image,
       imageHost: 'base64',
@@ -207,13 +212,13 @@ async function saveSubmittedSlip(token, image, verification = {}) {
 
 async function submitSlip(body) {
   const token = clean(body.token, 100);
-  if (!validToken(token)) throw new Error('à¸£à¸«à¸±à¸ªà¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+  if (!validToken(token)) throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
   const image = String(body.image || '');
-  if (!validSlipImage(image)) throw new Error('à¹à¸à¸¥à¹à¸ªà¸¥à¸´à¸à¸à¹à¸­à¸à¹à¸à¹à¸ JPG, PNG à¸«à¸£à¸·à¸­ WebP à¹à¸¥à¸°à¸¡à¸µà¸à¸à¸²à¸à¹à¸¡à¹à¹à¸à¸´à¸ 700 KB');
+  if (!validSlipImage(image)) throw new Error('ไฟล์สลิปต้องเป็น JPG, PNG หรือ WebP และมีขนาดไม่เกิน 700 KB');
 
   const order = await getOrderWithDeliveries(token);
-  if (!order) throw new Error('à¹à¸¡à¹à¸à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¹à¸°');
-  if (!['awaiting_slip', 'rejected'].includes(order.status)) throw new Error('à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¸µà¹à¹à¸¡à¹à¸ªà¸²à¸¡à¸²à¸£à¸à¸ªà¹à¸à¸ªà¸¥à¸´à¸à¸à¹à¸³à¹à¸à¹');
+  if (!order) throw new Error('ไม่พบออร์เดอร์ค่ะ');
+  if (!['awaiting_slip', 'rejected'].includes(order.status)) throw new Error('ออร์เดอร์นี้ไม่สามารถส่งสลิปซ้ำได้');
 
   try {
     const verification = await verifyEasySlip(image, order);
@@ -226,10 +231,10 @@ async function submitSlip(body) {
 
     try {
       await adminApprove(token);
-      return { ok: true, verified: true, message: 'à¸à¸£à¸§à¸à¸ªà¸¥à¸´à¸à¸ªà¸³à¹à¸£à¹à¸à¹à¸¥à¸°à¸¢à¸·à¸à¸¢à¸±à¸à¸à¸²à¸£à¸à¸³à¸£à¸°à¹à¸à¸´à¸à¹à¸¥à¹à¸§à¸à¹à¸°' };
+      return { ok: true, verified: true, message: 'ตรวจสลิปสำเร็จและยืนยันการชำระเงินแล้วค่ะ' };
     } catch (approvalError) {
       console.error('EasySlip verified but automatic fulfillment failed', approvalError);
-      return { ok: true, verified: true, manualReview: true, message: 'à¸à¸£à¸§à¸à¸ªà¸¥à¸´à¸à¸à¹à¸²à¸à¹à¸¥à¹à¸§ à¹à¸à¹à¸£à¸°à¸à¸à¸ªà¹à¸à¸ªà¸´à¸à¸à¹à¸²à¸­à¸±à¸à¹à¸à¸¡à¸±à¸à¸´à¹à¸¡à¹à¸ªà¸³à¹à¸£à¹à¸ à¸à¸£à¸¸à¸à¸²à¹à¸«à¹à¹à¸­à¸à¸¡à¸´à¸à¸à¸£à¸§à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¹à¸°' };
+      return { ok: true, verified: true, manualReview: true, message: 'ตรวจสลิปผ่านแล้ว แต่ระบบส่งสินค้าอัตโนมัติไม่สำเร็จ กรุณาให้แอดมินตรวจออร์เดอร์ค่ะ' };
     }
   } catch (error) {
     console.error('EasySlip verification failed', error);
@@ -257,7 +262,7 @@ async function submitSlip(body) {
         code,
         message: error.message
       });
-      return { ok: true, verified: false, manualReview: true, message: 'à¸ªà¹à¸à¸ªà¸¥à¸´à¸à¹à¸¥à¹à¸§à¸à¹à¸° à¸£à¸°à¸à¸à¸à¸£à¸§à¸à¸­à¸±à¸à¹à¸à¸¡à¸±à¸à¸´à¸à¸±à¸à¸à¹à¸­à¸ à¸à¸¶à¸à¸ªà¹à¸à¹à¸«à¹à¹à¸­à¸à¸¡à¸´à¸à¸à¸£à¸§à¸à¸ªà¸­à¸à¸à¹à¸°' };
+      return { ok: true, verified: false, manualReview: true, message: 'ส่งสลิปแล้วค่ะ ระบบตรวจอัตโนมัติขัดข้อง จึงส่งให้แอดมินตรวจสอบค่ะ' };
     }
 
     throw error;
@@ -306,31 +311,17 @@ function installmentSummary(data) {
 }
 
 function normalizeInstallmentDoc(id, data) {
-  const source = data || {};
-  const summary = installmentSummary(source);
-  const status = String(source.status || 'active');
-  const statusLabel = source.statusLabel || ({
-    active: 'à¸à¸³à¸¥à¸±à¸à¸à¹à¸­à¸',
-    completed: 'à¸à¸³à¸£à¸°à¸à¸£à¸à¹à¸¥à¹à¸§',
-    cancelled: 'à¸¢à¸à¹à¸¥à¸´à¸'
-  }[status] || status);
-
+  const summary = installmentSummary(data || {});
   return {
     id,
-    ...source,
-    ...summary,
-    total: Number.isFinite(Number(source.total)) ? Number(source.total) : summary.totalCents / 100,
-    paid: Number.isFinite(Number(source.paid)) ? Number(source.paid) : summary.paidCents / 100,
-    remaining: summary.remainingCents / 100,
-    installmentNo: Number(source.installmentNo) || Number(source.currentInstallment) || 1,
-    totalInstallments: Number(source.totalInstallments) || summary.installmentCount,
-    statusLabel
+    ...data,
+    ...summary
   };
 }
 
 async function createInstallment(body) {
   const uid = clean(body.uid, 200);
-  if (!validUid(uid)) throw new Error('à¸£à¸«à¸±à¸ªà¸ªà¸¡à¸²à¸à¸´à¸à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+  if (!validUid(uid)) throw new Error('รหัสสมาชิกไม่ถูกต้อง');
 
   const name = clean(body.name, 120);
   const contact = clean(body.contact, 120);
@@ -344,12 +335,12 @@ async function createInstallment(body) {
   const totalCents = Math.round(Number(body.totalCents));
   const installmentCount = Math.round(Number(body.installmentCount));
 
-  if (!name) throw new Error('à¸à¸£à¸¸à¸à¸²à¸£à¸°à¸à¸¸à¸à¸·à¹à¸­à¸ªà¸¡à¸²à¸à¸´à¸');
+  if (!name) throw new Error('กรุณาระบุชื่อสมาชิก');
   if (!Number.isInteger(totalCents) || totalCents <= 0) {
-    throw new Error('à¸¢à¸­à¸à¸à¹à¸­à¸à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+    throw new Error('ยอดผ่อนไม่ถูกต้อง');
   }
   if (!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 60) {
-    throw new Error('à¸à¸³à¸à¸§à¸à¸à¸§à¸à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+    throw new Error('จำนวนงวดไม่ถูกต้อง');
   }
 
   const installmentAmountCents = Math.ceil(totalCents / installmentCount);
@@ -393,7 +384,7 @@ async function createInstallment(body) {
 
 async function getInstallmentById(id) {
   const value = clean(id, 200);
-  if (!value) throw new Error('à¹à¸¡à¹à¸à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹à¸­à¸à¸à¹à¸°');
+  if (!value) throw new Error('ไม่พบรายการผ่อนค่ะ');
 
   const snap = await db().collection('installments_cakee').doc(value).get();
   if (!snap.exists) return null;
@@ -402,7 +393,7 @@ async function getInstallmentById(id) {
 }
 
 async function listInstallmentsForUid(uid) {
-  if (!validUid(uid)) throw new Error('à¸£à¸«à¸±à¸ªà¸ªà¸¡à¸²à¸à¸´à¸à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+  if (!validUid(uid)) throw new Error('รหัสสมาชิกไม่ถูกต้อง');
 
   const snap = await db()
     .collection('installments_cakee')
@@ -424,26 +415,26 @@ async function submitInstallmentSlip(body) {
   const uid = clean(body.uid, 200);
   const image = String(body.image || '');
 
-  if (!id) throw new Error('à¹à¸¡à¹à¸à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹à¸­à¸à¸à¹à¸°');
-  if (!validUid(uid)) throw new Error('à¸£à¸«à¸±à¸ªà¸ªà¸¡à¸²à¸à¸´à¸à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+  if (!id) throw new Error('ไม่พบรายการผ่อนค่ะ');
+  if (!validUid(uid)) throw new Error('รหัสสมาชิกไม่ถูกต้อง');
   if (!validSlipImage(image)) {
-    throw new Error('à¹à¸à¸¥à¹à¸ªà¸¥à¸´à¸à¸à¹à¸­à¸à¹à¸à¹à¸ JPG, PNG à¸«à¸£à¸·à¸­ WebP à¹à¸¥à¸°à¸¡à¸µà¸à¸à¸²à¸à¹à¸¡à¹à¹à¸à¸´à¸ 700 KB');
+    throw new Error('ไฟล์สลิปต้องเป็น JPG, PNG หรือ WebP และมีขนาดไม่เกิน 700 KB');
   }
 
   const installmentRef = db().collection('installments_cakee').doc(id);
   const slipRef = installmentRef.collection('slips').doc();
 
   const snap = await installmentRef.get();
-  if (!snap.exists) throw new Error('à¹à¸¡à¹à¸à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹à¸­à¸à¸à¹à¸°');
+  if (!snap.exists) throw new Error('ไม่พบรายการผ่อนค่ะ');
 
   const installment = snap.data() || {};
   if (String(installment.uid || '') !== uid) {
-    throw new Error('à¹à¸¡à¹à¸ªà¸²à¸¡à¸²à¸£à¸à¸ªà¹à¸à¸ªà¸¥à¸´à¸à¸à¸­à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸à¸µà¹à¹à¸à¹à¸à¹à¸°');
+    throw new Error('ไม่สามารถส่งสลิปของรายการนี้ได้ค่ะ');
   }
 
   const summary = installmentSummary(installment);
   if (summary.completed || installment.status === 'completed') {
-    throw new Error('à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹à¸­à¸à¸à¸µà¹à¸à¸³à¸£à¸°à¸à¸£à¸à¹à¸¥à¹à¸§à¸à¹à¸°');
+    throw new Error('รายการผ่อนนี้ชำระครบแล้วค่ะ');
   }
 
   const currentInstallment = Math.min(
@@ -461,7 +452,7 @@ async function submitInstallmentSlip(body) {
 
   const payload = {
     base64: image,
-    remark: `${id}-à¸à¸§à¸${currentInstallment}`,
+    remark: `${id}-งวด${currentInstallment}`,
     matchAmount: expectedBaht,
     checkDuplicate: true
   };
@@ -482,7 +473,7 @@ async function submitInstallmentSlip(body) {
 
   if (!response.ok || !result.success) {
     const code = result?.error?.code || `HTTP_${response.status}`;
-    const message = result?.error?.message || 'EasySlip à¸à¸£à¸§à¸à¸ªà¸¥à¸´à¸à¹à¸¡à¹à¸ªà¸³à¹à¸£à¹à¸';
+    const message = result?.error?.message || 'EasySlip ตรวจสลิปไม่สำเร็จ';
     const error = new Error(message);
     error.code = code;
     throw error;
@@ -494,21 +485,21 @@ async function submitInstallmentSlip(body) {
     (Number.isFinite(amountInSlip) && amountInSlip === expectedBaht);
 
   if (data.isDuplicate === true) {
-    const error = new Error('à¸ªà¸¥à¸´à¸à¸à¸µà¹à¹à¸à¸¢à¸à¸¹à¸à¸à¸£à¸§à¸à¸ªà¸­à¸à¹à¸¥à¹à¸§à¸à¹à¸°');
+    const error = new Error('สลิปนี้เคยถูกตรวจสอบแล้วค่ะ');
     error.code = 'DUPLICATE_SLIP';
     throw error;
   }
 
   if (!amountMatched) {
     const error = new Error(
-      `à¸¢à¸­à¸à¹à¸à¸ªà¸¥à¸´à¸à¹à¸¡à¹à¸à¸£à¸à¸à¸±à¸à¸¢à¸­à¸à¸à¸§à¸à¸à¹à¸° (${Number.isFinite(amountInSlip) ? amountInSlip.toFixed(2) : '-'} à¸à¸²à¸)`
+      `ยอดในสลิปไม่ตรงกับยอดงวดค่ะ (${Number.isFinite(amountInSlip) ? amountInSlip.toFixed(2) : '-'} บาท)`
     );
     error.code = 'AMOUNT_MISMATCH';
     throw error;
   }
 
   if (matchAccount && data.matchedAccount == null) {
-    const error = new Error('à¸à¸±à¸à¸à¸µà¸à¸¹à¹à¸£à¸±à¸à¹à¸à¸ªà¸¥à¸´à¸à¹à¸¡à¹à¸à¸£à¸à¸à¸±à¸à¸à¸±à¸à¸à¸µà¸£à¹à¸²à¸à¸à¸µà¹à¸¥à¸à¸à¸°à¹à¸à¸µà¸¢à¸à¸à¸±à¸ EasySlip à¸à¹à¸°');
+    const error = new Error('บัญชีผู้รับในสลิปไม่ตรงกับบัญชีร้านที่ลงทะเบียนกับ EasySlip ค่ะ');
     error.code = 'ACCOUNT_MISMATCH';
     throw error;
   }
@@ -517,16 +508,16 @@ async function submitInstallmentSlip(body) {
 
   await db().runTransaction(async tx => {
     const fresh = await tx.get(installmentRef);
-    if (!fresh.exists) throw new Error('à¹à¸¡à¹à¸à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹à¸­à¸à¸à¹à¸°');
+    if (!fresh.exists) throw new Error('ไม่พบรายการผ่อนค่ะ');
 
     const current = fresh.data() || {};
     const currentSummary = installmentSummary(current);
 
     if (String(current.uid || '') !== uid) {
-      throw new Error('à¹à¸¡à¹à¸ªà¸²à¸¡à¸²à¸£à¸à¸ªà¹à¸à¸ªà¸¥à¸´à¸à¸à¸­à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸à¸µà¹à¹à¸à¹à¸à¹à¸°');
+      throw new Error('ไม่สามารถส่งสลิปของรายการนี้ได้ค่ะ');
     }
     if (currentSummary.completed || current.status === 'completed') {
-      throw new Error('à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹à¸­à¸à¸à¸µà¹à¸à¸³à¸£à¸°à¸à¸£à¸à¹à¸¥à¹à¸§à¸à¹à¸°');
+      throw new Error('รายการผ่อนนี้ชำระครบแล้วค่ะ');
     }
 
     const currentNo = Math.min(
@@ -588,8 +579,8 @@ async function submitInstallmentSlip(body) {
     completed: Boolean(updated?.completed),
     installment: updated,
     message: updated?.completed
-      ? 'à¸à¸£à¸§à¸à¸ªà¸¥à¸´à¸à¸ªà¸³à¹à¸£à¹à¸à¹à¸¥à¸°à¸à¸³à¸£à¸°à¸¢à¸­à¸à¸à¹à¸­à¸à¸à¸£à¸à¹à¸¥à¹à¸§à¸à¹à¸°'
-      : 'à¸à¸£à¸§à¸à¸ªà¸¥à¸´à¸à¸ªà¸³à¹à¸£à¹à¸à¹à¸¥à¸°à¸à¸±à¸à¸à¸¶à¸à¸¢à¸­à¸à¸à¸§à¸à¸à¸µà¹à¹à¸¥à¹à¸§à¸à¹à¸°'
+      ? 'ตรวจสลิปสำเร็จและชำระยอดผ่อนครบแล้วค่ะ'
+      : 'ตรวจสลิปสำเร็จและบันทึกยอดงวดนี้แล้วค่ะ'
   };
 }
 
@@ -605,10 +596,11 @@ async function adminInstallmentList() {
 
 async function adminInstallmentUpdate(body) {
   const id = clean(body.installmentId || body.id, 200);
-  if (!id) throw new Error('à¹à¸¡à¹à¸à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹à¸­à¸à¸à¹à¸°');
+  if (!id) throw new Error('ไม่พบรายการผ่อนค่ะ');
   const ref = db().collection('installments_cakee').doc(id);
   const snap = await ref.get();
-  const current = snap.exists ? (snap.data() || {}) : {};
+  if (!snap.exists) throw new Error('ไม่พบรายการผ่อนค่ะ');
+  const current = snap.data() || {};
   const patch = {};
 
   if (body.name !== undefined) patch.name = clean(body.name, 120);
@@ -624,7 +616,7 @@ async function adminInstallmentUpdate(body) {
 
   if (body.status !== undefined) {
     const raw = String(body.status);
-    const map = { 'à¸à¸³à¸¥à¸±à¸à¸à¹à¸­à¸':'active', 'à¸à¸³à¸£à¸°à¸à¸£à¸à¹à¸¥à¹à¸§':'completed', 'à¸à¹à¸²à¸à¸à¸³à¸£à¸°':'active', 'à¸¢à¸à¹à¸¥à¸´à¸':'cancelled' };
+    const map = { 'กำลังผ่อน':'active', 'ชำระครบแล้ว':'completed', 'ค้างชำระ':'active', 'ยกเลิก':'cancelled' };
     patch.status = map[raw] || (['active','completed','cancelled'].includes(raw) ? raw : 'active');
     patch.statusLabel = raw;
   }
@@ -639,60 +631,20 @@ async function adminInstallmentUpdate(body) {
     patch.totalCents = Math.round(totalBaht * 100);
     patch.paidCents = Math.round(safePaid * 100);
     patch.remainingCents = Math.round(patch.remaining * 100);
-    if (patch.remaining <= 0) { patch.status = 'completed'; patch.statusLabel = 'à¸à¸³à¸£à¸°à¸à¸£à¸à¹à¸¥à¹à¸§'; }
+    if (patch.remaining <= 0) { patch.status = 'completed'; patch.statusLabel = 'ชำระครบแล้ว'; }
   }
 
   if (body.totalInstallments !== undefined) patch.installmentCount = Math.max(1, Math.round(Number(body.totalInstallments) || 1));
   if (body.installmentNo !== undefined) patch.currentInstallment = Math.max(1, Math.round(Number(body.installmentNo) || 1));
   patch.updatedAt = FieldValue.serverTimestamp();
-  if (!Object.keys(patch).length) throw new Error('à¹à¸¡à¹à¸¡à¸µà¸à¹à¸­à¸¡à¸¹à¸¥à¸ªà¸³à¸«à¸£à¸±à¸à¹à¸à¹à¹à¸');
-
-  // à¹à¸­à¸à¸¡à¸´à¸à¸ªà¸²à¸¡à¸²à¸£à¸à¸ªà¸£à¹à¸²à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹à¸­à¸à¸à¸²à¸à¸«à¸¥à¸±à¸à¸à¹à¸²à¸à¹à¸à¹à¹à¸à¸¢à¹à¸¡à¹à¸à¹à¸­à¸à¹à¸à¹ UID à¸à¸­à¸à¸¥à¸¹à¸à¸à¹à¸²
-  // à¹à¸à¸·à¹à¸­à¹à¸¡à¹à¹à¸«à¹à¸à¸­à¸£à¹à¸¡à¸«à¸¥à¸±à¸à¸à¹à¸²à¸à¸à¸´à¸à¸à¸±à¸à¸«à¸² âà¸£à¸«à¸±à¸ªà¸ªà¸¡à¸²à¸à¸´à¸à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸â
-  if (!snap.exists) {
-    const totalBaht = Number.isFinite(Number(patch.total)) ? Number(patch.total) : 0;
-    const paidBaht = Number.isFinite(Number(patch.paid)) ? Number(patch.paid) : 0;
-    const safePaid = Math.min(Math.max(0, paidBaht), Math.max(0, totalBaht));
-    const totalCents = Math.round(totalBaht * 100);
-    const paidCents = Math.round(safePaid * 100);
-    const installmentCount = Math.max(1, Number(patch.installmentCount || body.totalInstallments || 1));
-    const currentInstallment = Math.max(1, Number(patch.currentInstallment || body.installmentNo || 1));
-
-    await ref.set({
-      installmentId: id,
-      uid: clean(body.uid, 200) || '',
-      name: patch.name || '',
-      phone4: patch.phone4 || '',
-      orderNo: patch.orderNo || '',
-      product: patch.product || '',
-      total: totalBaht,
-      paid: safePaid,
-      remaining: Math.max(0, totalBaht - safePaid),
-      totalCents,
-      paidCents,
-      remainingCents: Math.max(0, totalCents - paidCents),
-      installmentNo: currentInstallment,
-      currentInstallment,
-      totalInstallments: installmentCount,
-      installmentCount,
-      paidInstallments: totalCents > 0 && paidCents >= totalCents ? installmentCount : Math.max(0, currentInstallment - 1),
-      nextDueDate: patch.nextDueDate || '',
-      status: patch.status || (paidCents >= totalCents && totalCents > 0 ? 'completed' : 'active'),
-      statusLabel: patch.statusLabel || (paidCents >= totalCents && totalCents > 0 ? 'à¸à¸³à¸£à¸°à¸à¸£à¸à¹à¸¥à¹à¸§' : 'à¸à¸³à¸¥à¸±à¸à¸à¹à¸­à¸'),
-      note: patch.note || '',
-      progress: totalCents > 0 ? Math.round((paidCents / totalCents) * 10000) / 100 : 0,
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp()
-    });
-  } else {
-    await ref.update(patch);
-  }
+  if (!Object.keys(patch).length) throw new Error('ไม่มีข้อมูลสำหรับแก้ไข');
+  await ref.update(patch);
   return { ok: true, installment: await getInstallmentById(id) };
 }
 
 async function adminInstallmentDelete(id) {
   const value = clean(id, 200);
-  if (!value) throw new Error('à¹à¸¡à¹à¸à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹à¸­à¸à¸à¹à¸°');
+  if (!value) throw new Error('ไม่พบรายการผ่อนค่ะ');
 
   const ref = db().collection('installments_cakee').doc(value);
   const slips = await ref.collection('slips').get();
@@ -715,7 +667,7 @@ async function adminShippingList() {
 
 async function adminShippingUpdate(body) {
   const id = clean(body.id || body.shippingId, 200);
-  if (!id) throw new Error('à¹à¸¡à¹à¸à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸à¸±à¸ªà¸à¸¸à¸à¹à¸°');
+  if (!id) throw new Error('ไม่พบรายการพัสดุค่ะ');
   const oldId = clean(body.oldId, 200);
   const payload = {
     name: clean(body.name, 120),
@@ -732,7 +684,7 @@ async function adminShippingUpdate(body) {
     createdAt: Number(body.createdAt) || Date.now()
   };
   if (!payload.name || payload.phone4.length !== 4 || !payload.trackingNo) {
-    throw new Error('à¸à¸£à¸¸à¸à¸²à¸à¸£à¸­à¸à¸à¸·à¹à¸­ à¹à¸à¸­à¸£à¹ 4 à¸à¸±à¸§à¸à¹à¸²à¸¢ à¹à¸¥à¸°à¹à¸¥à¸à¸à¸±à¸ªà¸à¸¸à¹à¸«à¹à¸à¸£à¸à¸à¹à¸°');
+    throw new Error('กรุณากรอกชื่อ เบอร์ 4 ตัวท้าย และเลขพัสดุให้ครบค่ะ');
   }
   await db().collection('shipping_cakee').doc(id).set(payload, { merge: false });
   if (oldId && oldId !== id) await db().collection('shipping_cakee').doc(oldId).delete();
@@ -741,7 +693,7 @@ async function adminShippingUpdate(body) {
 
 async function adminShippingDelete(id) {
   const value = clean(id, 200);
-  if (!value) throw new Error('à¹à¸¡à¹à¸à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸à¸±à¸ªà¸à¸¸à¸à¹à¸°');
+  if (!value) throw new Error('ไม่พบรายการพัสดุค่ะ');
   await db().collection('shipping_cakee').doc(value).delete();
   return { ok: true };
 }
@@ -752,14 +704,14 @@ async function adminList() {
 }
 
 async function adminSlip(id) {
-  if (!validToken(id)) throw new Error('à¸£à¸«à¸±à¸ªà¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+  if (!validToken(id)) throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
   const snap = await db().collection('order_slips_cakee').doc(id).get();
   if (!snap.exists) return null;
   return { id: snap.id, ...snap.data() };
 }
 
 async function adminApprove(id) {
-  if (!validToken(id)) throw new Error('à¸£à¸«à¸±à¸ªà¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+  if (!validToken(id)) throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
   const orderRef = db().collection('orders_cakee').doc(id);
   const slipRef = db().collection('order_slips_cakee').doc(id);
 
@@ -767,15 +719,15 @@ async function adminApprove(id) {
     const orderSnap = await tx.get(orderRef);
     const slipSnap = await tx.get(slipRef);
     if (!orderSnap.exists || orderSnap.data().status !== 'submitted' || !slipSnap.exists) {
-      throw new Error('à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸«à¸£à¸·à¸­à¸ªà¸¥à¸´à¸à¹à¸¡à¹à¸à¸£à¹à¸­à¸¡');
+      throw new Error('ออร์เดอร์หรือสลิปไม่พร้อม');
     }
     const order = orderSnap.data();
     const items = Array.isArray(order.items) ? order.items : [];
     if (!items.length || items.length > 20 || items.some(item => !Number.isInteger(item.qty) || item.qty < 1 || item.qty > 20 || !Number.isInteger(item.priceCents) || item.priceCents < 1)) {
-      throw new Error('à¸à¹à¸­à¸¡à¸¹à¸¥à¸ªà¸´à¸à¸à¹à¸²à¹à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+      throw new Error('ข้อมูลสินค้าในออร์เดอร์ไม่ถูกต้อง');
     }
     if (new Set(items.map(item => item.productId)).size !== items.length || items.reduce((sum, item) => sum + item.qty * item.priceCents, 0) !== order.totalCents) {
-      throw new Error('à¸¢à¸­à¸à¸ªà¸´à¸à¸à¹à¸²à¹à¸¡à¹à¸à¸£à¸ à¸à¸£à¸¸à¸à¸²à¸à¸£à¸§à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹');
+      throw new Error('ยอดสินค้าไม่ตรง กรุณาตรวจออร์เดอร์');
     }
 
     const productSnaps = [];
@@ -787,20 +739,20 @@ async function adminApprove(id) {
 
     items.forEach((item, index) => {
       const product = productSnaps[index].data();
-      if (!product || clean(product.title || 'à¸ªà¸´à¸à¸à¹à¸²', 120) !== item.title || Math.round(Number(product.priceBaht) * 100) !== item.priceCents || (product.deliveryType || 'custom') !== item.deliveryType) {
-        throw new Error('à¸£à¸²à¸à¸²à¸«à¸£à¸·à¸­à¸à¸£à¸°à¹à¸ à¸à¸ªà¸´à¸à¸à¹à¸²à¸¡à¸µà¸à¸²à¸£à¹à¸à¹à¹à¸ à¸à¸£à¸¸à¸à¸²à¸à¸£à¸§à¸à¸ªà¸­à¸à¸à¹à¸­à¸à¸¢à¸·à¸à¸¢à¸±à¸');
+      if (!product || clean(product.title || 'สินค้า', 120) !== item.title || Math.round(Number(product.priceBaht) * 100) !== item.priceCents || (product.deliveryType || 'custom') !== item.deliveryType) {
+        throw new Error('ราคาหรือประเภทสินค้ามีการแก้ไข กรุณาตรวจสอบก่อนยืนยัน');
       }
       const stock = stockSnaps[index]?.data();
       if (item.deliveryType === 'file') {
-        if (!stock?.fileData) throw new Error('à¸¢à¸±à¸à¹à¸¡à¹à¸¡à¸µà¹à¸à¸¥à¹à¸ªà¸³à¸«à¸£à¸±à¸ ' + item.title);
+        if (!stock?.fileData) throw new Error('ยังไม่มีไฟล์สำหรับ ' + item.title);
         tx.set(orderRef.collection('deliveries').doc(item.productId), {
           fileData: stock.fileData,
-          fileName: stock.fileName || 'à¸ªà¸´à¸à¸à¹à¸²',
+          fileName: stock.fileName || 'สินค้า',
           deliveredAt: FieldValue.serverTimestamp()
         });
       }
       if (item.deliveryType === 'code') {
-        if (!stock || !Array.isArray(stock.codes) || stock.codes.length < item.qty) throw new Error('à¹à¸à¹à¸à¸à¸­à¸ ' + item.title + ' à¹à¸¡à¹à¸à¸­');
+        if (!stock || !Array.isArray(stock.codes) || stock.codes.length < item.qty) throw new Error('โค้ดของ ' + item.title + ' ไม่พอ');
         tx.set(orderRef.collection('deliveries').doc(item.productId), {
           codes: stock.codes.slice(0, item.qty),
           deliveredAt: FieldValue.serverTimestamp()
@@ -817,20 +769,20 @@ async function adminApprove(id) {
 async function adminCustomDelivery(body) {
   const id = clean(body.id, 100);
   const productId = clean(body.productId, 200);
-  if (!validToken(id) || !productId) throw new Error('à¸à¹à¸­à¸¡à¸¹à¸¥à¸à¸²à¸£à¸ªà¹à¸à¸à¸²à¸à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+  if (!validToken(id) || !productId) throw new Error('ข้อมูลการส่งงานไม่ถูกต้อง');
 
   const orderRef = db().collection('orders_cakee').doc(id);
   const orderSnap = await orderRef.get();
-  if (!orderSnap.exists) throw new Error('à¹à¸¡à¹à¸à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¹à¸°');
+  if (!orderSnap.exists) throw new Error('ไม่พบออร์เดอร์ค่ะ');
 
   const order = orderSnap.data() || {};
-  if (order.status !== 'paid') throw new Error('à¸à¹à¸­à¸à¸¢à¸·à¸à¸¢à¸±à¸à¸à¸³à¸£à¸°à¹à¸à¸´à¸à¸à¹à¸­à¸à¸à¸¶à¸à¸à¸°à¸ªà¹à¸à¸à¸²à¸à¹à¸à¹à¸à¹à¸°');
+  if (order.status !== 'paid') throw new Error('ต้องยืนยันชำระเงินก่อนจึงจะส่งงานได้ค่ะ');
 
   const item = Array.isArray(order.items)
     ? order.items.find(x => String(x.productId) === productId)
     : null;
-  if (!item) throw new Error('à¸ªà¸´à¸à¸à¹à¸²à¸à¸µà¹à¹à¸¡à¹à¹à¸à¹à¸­à¸¢à¸¹à¹à¹à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¹à¸°');
-  if (item.deliveryType !== 'custom') throw new Error('à¸ªà¸´à¸à¸à¹à¸²à¸à¸µà¹à¹à¸¡à¹à¹à¸à¹à¸ªà¸´à¸à¸à¹à¸²à¸à¸µà¹à¸ªà¹à¸à¸à¸²à¸à¹à¸à¸à¸à¸³à¸«à¸à¸à¹à¸­à¸à¸à¹à¸°');
+  if (!item) throw new Error('สินค้านี้ไม่ได้อยู่ในออร์เดอร์ค่ะ');
+  if (item.deliveryType !== 'custom') throw new Error('สินค้านี้ไม่ใช่สินค้าที่ส่งงานแบบกำหนดเองค่ะ');
 
   const text = clean(body.text, 5000);
   const fileData = String(body.fileData || '');
@@ -838,10 +790,10 @@ async function adminCustomDelivery(body) {
   const imageHost = clean(body.imageHost, 500);
   const fileName = clean(body.fileName, 255);
 
-  if (!text && !fileData) throw new Error('à¸à¸£à¸¸à¸à¸²à¹à¸ªà¹à¸à¹à¸­à¸à¸§à¸²à¸¡à¸«à¸£à¸·à¸­à¹à¸¥à¸·à¸­à¸à¹à¸à¸¥à¹à¸à¹à¸°');
-  if (fileData.length > 450 * 1024) throw new Error('à¹à¸à¸¥à¹à¸ªà¹à¸à¸à¸²à¸à¹à¸«à¸à¹à¹à¸à¸´à¸ 450 KB à¸à¹à¸°');
+  if (!text && !fileData) throw new Error('กรุณาใส่ข้อความหรือเลือกไฟล์ค่ะ');
+  if (fileData.length > 450 * 1024) throw new Error('ไฟล์ส่งงานใหญ่เกิน 450 KB ค่ะ');
   if (imageHost && !['cloudinary', 'inline'].includes(imageHost)) {
-    throw new Error('à¹à¸«à¸¥à¹à¸à¹à¸à¸¥à¹à¸ªà¹à¸à¸à¸²à¸à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸à¸à¹à¸°');
+    throw new Error('แหล่งไฟล์ส่งงานไม่ถูกต้องค่ะ');
   }
 
   await orderRef.collection('deliveries').doc(productId).set({
@@ -856,13 +808,13 @@ async function adminCustomDelivery(body) {
 }
 
 async function adminReject(id) {
-  if (!validToken(id)) throw new Error('à¸£à¸«à¸±à¸ªà¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+  if (!validToken(id)) throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
   const ref = db().collection('orders_cakee').doc(id);
   await db().runTransaction(async tx => {
     const snap = await tx.get(ref);
-    if (!snap.exists) throw new Error('à¹à¸¡à¹à¸à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¹à¸°');
+    if (!snap.exists) throw new Error('ไม่พบออร์เดอร์ค่ะ');
     if (snap.data().status !== 'submitted') {
-      throw new Error('à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¸µà¹à¹à¸¡à¹à¸­à¸¢à¸¹à¹à¹à¸à¸ªà¸à¸²à¸à¸°à¸£à¸­à¸à¸£à¸§à¸à¸ªà¸¥à¸´à¸à¸à¹à¸°');
+      throw new Error('ออร์เดอร์นี้ไม่อยู่ในสถานะรอตรวจสลิปค่ะ');
     }
     tx.update(ref, { status: 'rejected', rejectedAt: FieldValue.serverTimestamp() });
   });
@@ -870,18 +822,18 @@ async function adminReject(id) {
 }
 
 async function adminCancel(id) {
-  if (!validToken(id)) throw new Error('à¸£à¸«à¸±à¸ªà¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+  if (!validToken(id)) throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
   const ref = db().collection('orders_cakee').doc(id);
   await db().runTransaction(async tx => {
     const snap = await tx.get(ref);
-    if (!snap.exists || snap.data().status === 'cancelled') throw new Error('à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¸µà¹à¸à¸¹à¸à¸¥à¸à¸«à¸£à¸·à¸­à¸¢à¸à¹à¸¥à¸´à¸à¹à¸¥à¹à¸§');
+    if (!snap.exists || snap.data().status === 'cancelled') throw new Error('ออร์เดอร์นี้ถูกลบหรือยกเลิกแล้ว');
     tx.update(ref, { status: 'cancelled', cancelledAt: FieldValue.serverTimestamp() });
   });
   return { ok: true };
 }
 
 async function adminDelete(id) {
-  if (!validToken(id)) throw new Error('à¸£à¸«à¸±à¸ªà¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+  if (!validToken(id)) throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
   const ref = db().collection('orders_cakee').doc(id);
   const deliveries = await ref.collection('deliveries').get();
   const batch = db().batch();
@@ -893,33 +845,33 @@ async function adminDelete(id) {
 }
 
 async function adminReceive(id) {
-  if (!validToken(id)) throw new Error('à¸£à¸«à¸±à¸ªà¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+  if (!validToken(id)) throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
   const ref = db().collection('orders_cakee').doc(id);
   await db().runTransaction(async tx => {
     const snap = await tx.get(ref);
-    if (!snap.exists) throw new Error('à¹à¸¡à¹à¸à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¹à¸°');
+    if (!snap.exists) throw new Error('ไม่พบออร์เดอร์ค่ะ');
     const order = snap.data() || {};
-    if (order.orderNo !== 'AM-' + id.slice(0, 8).toUpperCase()) throw new Error('à¹à¸¥à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¹à¸¡à¹à¸à¸£à¸à¸à¸±à¸à¸à¹à¸°');
-    if (order.status !== 'paid') throw new Error('à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¸µà¹à¸¢à¸±à¸à¹à¸¡à¹à¹à¸à¹à¸£à¸±à¸à¸à¸²à¸£à¸¢à¸·à¸à¸¢à¸±à¸à¸à¸³à¸£à¸°à¹à¸à¸´à¸à¸à¹à¸°');
-    if (order.receivedAt) throw new Error('à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¸µà¹à¸£à¸±à¸à¸ªà¸´à¸à¸à¹à¸²à¹à¸à¹à¸¥à¹à¸§à¸à¹à¸°');
+    if (order.orderNo !== 'AM-' + id.slice(0, 8).toUpperCase()) throw new Error('เลขออร์เดอร์ไม่ตรงกันค่ะ');
+    if (order.status !== 'paid') throw new Error('ออร์เดอร์นี้ยังไม่ได้รับการยืนยันชำระเงินค่ะ');
+    if (order.receivedAt) throw new Error('ออร์เดอร์นี้รับสินค้าไปแล้วค่ะ');
     tx.update(ref, { receivedAt: FieldValue.serverTimestamp(), receivedBy: ADMIN_UID });
   });
   return { ok: true };
 }
 
 async function adminComplete(id, completed) {
-  if (!validToken(id)) throw new Error('à¸£à¸«à¸±à¸ªà¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸');
+  if (!validToken(id)) throw new Error('รหัสออร์เดอร์ไม่ถูกต้อง');
   const ref = db().collection('orders_cakee').doc(id);
   await db().runTransaction(async tx => {
     const snap = await tx.get(ref);
-    if (!snap.exists) throw new Error('à¹à¸¡à¹à¸à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¹à¸°');
+    if (!snap.exists) throw new Error('ไม่พบออร์เดอร์ค่ะ');
     const order = snap.data() || {};
-    if (order.status !== 'paid') throw new Error('à¸à¹à¸­à¸à¸¢à¸·à¸à¸¢à¸±à¸à¸à¸³à¸£à¸°à¹à¸à¸´à¸à¸à¹à¸­à¸à¸à¸¶à¸à¸à¸°à¸à¸´à¸à¸à¸²à¸à¹à¸à¹à¸à¹à¸°');
+    if (order.status !== 'paid') throw new Error('ต้องยืนยันชำระเงินก่อนจึงจะปิดงานได้ค่ะ');
     if (completed) {
       const items = Array.isArray(order.items) ? order.items : [];
       const needsReceive = items.some(item => item.deliveryType !== 'custom');
       if (needsReceive && !order.receivedAt) {
-        throw new Error('à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¸µà¹à¸¢à¸±à¸à¹à¸¡à¹à¹à¸à¹à¸£à¸±à¸à¸ªà¸´à¸à¸à¹à¸²à¹à¸à¸¢à¸¥à¸¹à¸à¸à¹à¸²à¸à¹à¸°');
+        throw new Error('ออร์เดอร์นี้ยังไม่ได้รับสินค้าโดยลูกค้าค่ะ');
       }
       const customItems = items.filter(item => item.deliveryType === 'custom');
       if (customItems.length) {
@@ -929,7 +881,7 @@ async function adminComplete(id, completed) {
           const delivery = deliverySnap.data() || {};
           if (!deliverySnap.exists || (!delivery.text && !delivery.fileData)) missing.push(item.title || item.productId);
         }
-        if (missing.length) throw new Error('à¸¢à¸±à¸à¸ªà¹à¸à¸à¸²à¸à¹à¸¡à¹à¸à¸£à¸: ' + missing.join(', '));
+        if (missing.length) throw new Error('ยังส่งงานไม่ครบ: ' + missing.join(', '));
       }
     }
     tx.update(ref, {
@@ -948,9 +900,9 @@ module.exports = async (req, res) => {
     if (action === 'create') return send(res, 200, { ok: true, ...(await createOrder(body)) });
     if (action === 'lookup') {
       const token = clean(body.token, 100);
-      if (!validToken(token)) return send(res, 400, { ok: false, error: 'à¸£à¸«à¸±à¸ªà¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¹à¸¡à¹à¸à¸¹à¸à¸à¹à¸­à¸' });
+      if (!validToken(token)) return send(res, 400, { ok: false, error: 'รหัสออร์เดอร์ไม่ถูกต้อง' });
       const order = await getOrderWithDeliveries(token);
-      if (!order || order.orderNo !== 'AM-' + token.slice(0, 8).toUpperCase()) return send(res, 404, { ok: false, error: 'à¹à¸¡à¹à¸à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹à¸à¹à¸°' });
+      if (!order || order.orderNo !== 'AM-' + token.slice(0, 8).toUpperCase()) return send(res, 404, { ok: false, error: 'ไม่พบออร์เดอร์ค่ะ' });
       return send(res, 200, { ok: true, order });
     }
     if (action === 'submit-slip') return send(res, 200, await submitSlip(body));
@@ -958,9 +910,9 @@ module.exports = async (req, res) => {
     // Installment customer actions
     if (action === 'installment-get') {
       const installment = await getInstallmentById(clean(body.installmentId || body.id, 200));
-      if (!installment) return send(res, 404, { ok: false, error: 'à¹à¸¡à¹à¸à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹à¸­à¸à¸à¹à¸°' });
+      if (!installment) return send(res, 404, { ok: false, error: 'ไม่พบรายการผ่อนค่ะ' });
       if (body.uid && String(installment.uid || '') !== clean(body.uid, 200)) {
-        return send(res, 403, { ok: false, error: 'à¹à¸¡à¹à¸ªà¸²à¸¡à¸²à¸£à¸à¸à¸¹à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹à¸­à¸à¸à¸µà¹à¹à¸à¹à¸à¹à¸°' });
+        return send(res, 403, { ok: false, error: 'ไม่สามารถดูรายการผ่อนนี้ได้ค่ะ' });
       }
       return send(res, 200, { ok: true, installment });
     }
@@ -999,7 +951,7 @@ module.exports = async (req, res) => {
             ok: true,
             verified: false,
             manualReview: true,
-            message: 'à¸ªà¹à¸à¸ªà¸¥à¸´à¸à¹à¸¥à¹à¸§à¸à¹à¸° à¸£à¸°à¸à¸à¸à¸£à¸§à¸à¸­à¸±à¸à¹à¸à¸¡à¸±à¸à¸´à¸à¸±à¸à¸à¹à¸­à¸ à¸à¸¶à¸à¸ªà¹à¸à¹à¸«à¹à¹à¸­à¸à¸¡à¸´à¸à¸à¸£à¸§à¸à¸ªà¸­à¸à¸à¹à¸°'
+            message: 'ส่งสลิปแล้วค่ะ ระบบตรวจอัตโนมัติขัดข้อง จึงส่งให้แอดมินตรวจสอบค่ะ'
           });
         }
         throw error;
@@ -1040,6 +992,6 @@ module.exports = async (req, res) => {
   } catch (error) {
     console.error('order api error', error);
     const status = error.message === 'UNAUTHORIZED' ? 401 : error.message === 'FORBIDDEN' ? 403 : 400;
-    return send(res, status, { ok: false, error: error.message || 'à¹à¸à¸´à¸à¸à¹à¸­à¸à¸´à¸à¸à¸¥à¸²à¸à¹à¸à¸£à¸°à¸à¸à¸­à¸­à¸£à¹à¹à¸à¸­à¸£à¹' });
+    return send(res, status, { ok: false, error: error.message || 'เกิดข้อผิดพลาดในระบบออร์เดอร์' });
   }
 };
