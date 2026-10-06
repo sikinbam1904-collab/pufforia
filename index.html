@@ -4351,6 +4351,114 @@
             });
         }
 
+        function productCodeFieldValues() {
+            return [...document.querySelectorAll('#productCodeFields textarea')].map(field => field.value);
+        }
+
+        function updateProductCodeCount() {
+            const info = document.getElementById('productCodeStockInfo');
+            if (!info) return;
+            const count = productCodeFieldValues().filter(value => value.trim()).length;
+            const original = Array.isArray(productCodeOriginal) ? productCodeOriginal.length : 0;
+            info.textContent = `สต็อกพร้อมขายเดิม ${original} ชิ้น • หลังบันทึก ${count} ชิ้น`;
+        }
+
+        function renderProductCodeInputs(values = ['']) {
+            const container = document.getElementById('productCodeFields');
+            if (!container) return;
+            container.replaceChildren();
+            const list = Array.isArray(values) && values.length ? values : [''];
+            list.forEach((value, index) => {
+                const row = document.createElement('div');
+                row.className = 'rounded-xl border border-[#F8C8DC] bg-white p-2';
+
+                const header = document.createElement('div');
+                header.className = 'mb-1 flex items-center justify-between gap-2';
+
+                const label = document.createElement('label');
+                label.className = 'admin-label mb-0';
+                label.textContent = `สินค้าชิ้นที่ ${index + 1}`;
+
+                const field = document.createElement('textarea');
+                field.className = 'admin-input';
+                field.rows = 3;
+                field.maxLength = 500000;
+                field.placeholder = 'ใส่โค้ดหรือข้อความสินค้า 1 ชิ้น (ขึ้นบรรทัดใหม่ได้)';
+                field.value = String(value ?? '');
+                field.id = `productCodeField-${index}`;
+                field.autocomplete = 'off';
+                field.addEventListener('input', updateProductCodeCount);
+                label.htmlFor = field.id;
+
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'rounded-lg px-2 py-1 text-xs font-bold text-rose-600';
+                remove.textContent = 'ลบช่องนี้';
+                remove.setAttribute('aria-label', `ลบช่องสินค้า/โค้ดชิ้นที่ ${index + 1}`);
+                remove.onclick = () => removeProductCodeField(index);
+
+                header.append(label, remove);
+                row.append(header, field);
+                container.append(row);
+            });
+            updateProductCodeCount();
+        }
+
+        function addProductCodeField() {
+            const values = productCodeFieldValues();
+            values.push('');
+            renderProductCodeInputs(values);
+            document.getElementById('productCodeFields')?.lastElementChild?.querySelector('textarea')?.focus();
+        }
+
+        function removeProductCodeField(index) {
+            const values = productCodeFieldValues();
+            values.splice(index, 1);
+            renderProductCodeInputs(values);
+        }
+
+        function updateDeliveryFields() {
+            const type = document.getElementById('productDeliveryType')?.value || 'custom';
+            document.getElementById('productDeliveryFileField')?.classList.toggle('hidden', type !== 'file');
+            document.getElementById('productDeliveryCodeField')?.classList.toggle('hidden', type !== 'code');
+            if (type === 'code') {
+                const container = document.getElementById('productCodeFields');
+                if (container && !container.querySelector('textarea')) renderProductCodeInputs(['']);
+                updateProductCodeCount();
+            }
+        }
+
+        async function loadProductDeliveryInfo(id, version) {
+            const info = document.getElementById('productDeliveryFileInfo');
+            const stockInfo = document.getElementById('productCodeStockInfo');
+            if (info) info.textContent = id ? 'กำลังโหลดข้อมูลส่งมอบ...' : 'ไฟล์จะถูกเก็บแยกจากหน้าสินค้าสาธารณะ';
+            if (stockInfo) stockInfo.textContent = id ? 'กำลังโหลดสต็อกสินค้า...' : 'สต็อกพร้อมขายเดิม 0 ชิ้น • หลังบันทึก 0 ชิ้น';
+            if (!id || !db) {
+                productCodeInventoryReady = true;
+                updateProductCodeCount();
+                return;
+            }
+            try {
+                const snap = await db.collection('product_delivery_cakee').doc(id).get();
+                if (version !== productCodeLoadVersion || document.getElementById('productEditId').value !== id) return;
+                const data = snap.data() || {};
+                if (info) info.textContent = data.fileName ? `ไฟล์ปัจจุบัน: ${data.fileName}` : 'ยังไม่มีไฟล์สินค้า';
+                productCodeOriginal = Array.isArray(data.codes) ? data.codes.map(String) : [];
+                productCodeInventoryReady = true;
+                if (document.getElementById('productDeliveryType')?.value === 'code') {
+                    renderProductCodeInputs(productCodeOriginal);
+                } else {
+                    updateProductCodeCount();
+                }
+            } catch (error) {
+                if (version !== productCodeLoadVersion) return;
+                productCodeInventoryReady = false;
+                if (info) info.textContent = 'โหลดข้อมูลส่งมอบไม่สำเร็จ';
+                if (stockInfo) stockInfo.textContent = 'โหลดสต็อกสินค้าไม่สำเร็จ กรุณาลองเปิดสินค้าใหม่';
+                console.error('Loading product delivery failed:', error);
+            }
+        }
+
         function openProductModal(id = null, category = activeShopTab) {
             if (!firebaseReady || !db || !auth) {
                 const ready = initializeFirebaseSafely();
@@ -4908,9 +5016,6 @@
         async function submitGuestSlip(token,input,button) {
             const file=input.files?.[0];if(!file) return showToast('กรุณาเลือกภาพสลิปค่ะ');
             button.disabled=true;
-            const originalButtonText=button.textContent;
-            button.textContent='⏳ กำลังตรวจสอบสลิป...';
-            showToast('⏳ กำลังตรวจสอบสลิปค่ะ กรุณารอสักครู่นะคะ อย่ากดส่งซ้ำค่ะ');
             try {
                 const image=await compressToBase64Image(file,{maxDimension:1600,quality:0.82,maxDataUrlBytes:500*1024});
                 const response=await fetch('/api/order',{
@@ -4926,10 +5031,7 @@
             } catch(error) {
                 console.error('Automatic slip verification failed',error);
                 showToast(error.message||'ตรวจสลิปไม่สำเร็จค่ะ กรุณาลองใหม่อีกครั้ง');
-            } finally {
-                button.disabled=false;
-                button.textContent=originalButtonText||'ส่งสลิป';
-            }
+            } finally {button.disabled=false;}
         }
         function readSmallFile(file,maxBytes=300*1024) {
             return new Promise((resolve,reject)=>{
