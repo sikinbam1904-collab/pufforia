@@ -158,6 +158,7 @@ async function createOrder(body) {
     }
     const order = {
       orderNo: 'AM-' + token.slice(0, 8).toUpperCase(),
+      uid: validUid(body.uid) ? String(body.uid) : FieldValue.delete(),
       name: clean(body.name, 120),
       contact: clean(body.contact, 120),
       email: clean(body.email, 200),
@@ -366,6 +367,17 @@ function normalizeInstallmentDoc(id, data) {
     ...data,
     ...summary
   };
+}
+
+async function listOrdersForUid(uid) {
+  if (!validUid(uid)) throw new Error('รหัสสมาชิกไม่ถูกต้อง');
+  const snap = await db().collection('orders_cakee').where('uid', '==', uid).limit(100).get();
+  const rows = await Promise.all(snap.docs.map(async d => {
+    const data = d.data() || {};
+    const deliveriesSnap = await d.ref.collection('deliveries').get();
+    return { id:d.id, ...data, deliveries: deliveriesSnap.docs.map(x => ({id:x.id, ...x.data()})) };
+  }));
+  return rows.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 }
 
 async function createInstallment(body) {
@@ -989,9 +1001,12 @@ module.exports = async (req, res) => {
     const action = clean(body.action, 50);
 
     if (action === 'create') {
+      const header = String(req.headers.authorization || '');
       if (String(body.paymentMode || 'full') === 'installment') {
         const decoded = await requireUser(req);
         body.uid = decoded.uid;
+      } else if (header.startsWith('Bearer ')) {
+        try { body.uid = (await requireUser(req)).uid; } catch (_) { /* guest full-payment orders remain allowed */ }
       }
       return send(res, 200, { ok: true, ...(await createOrder(body)) });
     }
@@ -1015,6 +1030,11 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'customer-profile') return send(res, 200, await saveCustomerProfile(req, body));
+
+    if (action === 'customer-orders') {
+      const decoded = await requireUser(req);
+      return send(res, 200, { ok:true, orders: await listOrdersForUid(decoded.uid) });
+    }
 
     if (action === 'installment-list') {
       const decoded = await requireUser(req);
