@@ -1211,7 +1211,7 @@
                     <label class="admin-label">สถานะ:<select id="installmentStatusInput" class="admin-input"><option value="กำลังผ่อน">กำลังผ่อน</option><option value="ชำระครบแล้ว">ชำระครบแล้ว</option><option value="ค้างชำระ">ค้างชำระ</option><option value="ยกเลิก">ยกเลิก</option></select></label>
                     <label class="admin-label">หมายเหตุ:<textarea id="installmentNoteInput" rows="2" class="admin-input"></textarea></label>
                 </div>
-                <button onclick="saveInstallmentData()" class="w-full bg-[#D870B8] text-white font-bold py-3 rounded-xl text-sm mt-4">บันทึกรายการผ่อน</button>
+                <button type="button" onclick="saveInstallmentData()" class="w-full bg-[#D870B8] text-white font-bold py-3 rounded-xl text-sm mt-4">บันทึกรายการผ่อน</button>
             </div>
         </div>
     </div>
@@ -1568,6 +1568,14 @@
                 <label class="admin-label">รูปแบบส่งมอบ
                     <select id="productDeliveryType" class="admin-input" onchange="updateDeliveryFields()"><option value="custom">งานสั่งทำ / แอดมินส่งภายหลัง</option><option value="file">ไฟล์ขนาดเล็ก สามารถอัพโหลดและส่งสินค้าผ่านระบบเว็บได้</option><option value="code">ส่งสินค้าให้ลูกค้าอัตโนมัติหลังแอดมินกดยืนยันการชำระเงิน ( ตัดจากสต็อก )</option></select>
                 </label>
+                <div class="rounded-2xl border border-[#B7DFF2] bg-[#F5FBFF] p-3">
+                    <label class="admin-label flex items-center gap-2 mb-2"><input id="productInstallmentEnabled" type="checkbox" onchange="toggleProductInstallmentFields()"> <span>เปิดให้สินค้านี้ผ่อนชำระได้</span></label>
+                    <div id="productInstallmentFields" class="hidden space-y-2">
+                        <p class="text-[10px] text-[#7A6669]">ตั้งระยะเวลาผ่อนและจำนวนงวด ลูกค้าจะเห็นและคำนวณยอดจากหน้านี้อัตโนมัติ</p>
+                        <div id="productInstallmentPlans" class="space-y-2"></div>
+                        <button type="button" onclick="addProductInstallmentPlan()" class="w-full rounded-xl border border-[#B7DFF2] bg-white px-3 py-2 text-xs font-bold text-[#397CA5]">+ เพิ่มแผนผ่อน</button>
+                    </div>
+                </div>
                 <label class="admin-label flex items-center gap-2"><input id="productSoldOut" type="checkbox"> หมดชั่วคราว (ปิดรับออร์เดอร์สินค้านี้)</label>
                 <div id="productDeliveryFileField" class="hidden"><label class="admin-label">ไฟล์สินค้า (ภาพจะย่อแบบคมชัด / ไฟล์อื่นไม่เกิน 300 KB)
                     <input id="productDeliveryFile" type="file" accept="image/*,.pdf,.txt" class="admin-input"></label><p id="productDeliveryFileInfo" class="text-[10px] text-[#7A6669]"></p></div>
@@ -3329,7 +3337,7 @@
         function closeInstallmentAdminModal(){document.getElementById('installmentAdminModal').classList.remove('active');hideInstallmentAdminForm();}
         async function saveInstallmentData(){if(!db||!isAdminLoggedIn||auth?.currentUser?.uid!==ADMIN_UID)return showToast('กรุณาเข้าสู่ระบบแอดมินก่อนค่ะ');const oldId=document.getElementById('installmentEditId').value,name=document.getElementById('installmentNameInput').value.trim(),phone4=document.getElementById('installmentPhone4Input').value.replace(/\D/g,'').slice(-4),orderNo=document.getElementById('installmentOrderInput').value.trim(),product=document.getElementById('installmentProductInput').value.trim(),total=Math.max(0,Number(document.getElementById('installmentTotalInput').value)||0),paid=Math.max(0,Number(document.getElementById('installmentPaidInput').value)||0),installmentNo=Number(document.getElementById('installmentNoInput').value)||1,totalInstallments=Number(document.getElementById('installmentTotalNoInput').value)||1,nextDueDate=document.getElementById('installmentDueDateInput').value,status=document.getElementById('installmentStatusInput').value,note=document.getElementById('installmentNoteInput').value.trim();if(!name||phone4.length!==4)return showToast('กรุณากรอกชื่อและเบอร์ 4 ตัวท้ายให้ครบค่ะ');try{const id=oldId||await makeLookupKey(name,phone4);const result=await adminApi('admin-installment-update',{installmentId:id,name,phone4,orderNo,product,total,paid,installmentNo,totalInstallments,nextDueDate,status,note});installmentData=[...installmentData.filter(x=>x.id!==id),result.installment];renderInstallmentAdminList();hideInstallmentAdminForm();showToast('บันทึกข้อมูลยอดผ่อนแล้วค่ะ ✨');}catch(e){console.error(e);showToast(e.message||'บันทึกข้อมูลยอดผ่อนไม่สำเร็จค่ะ','fa-times-circle');}}
         async function loadInstallmentAdminData(){if(!db||!isAdminLoggedIn||auth?.currentUser?.uid!==ADMIN_UID)return;try{const result=await adminApi('admin-installment-list');installmentData=Array.isArray(result.installments)?result.installments:[];renderInstallmentAdminList();}catch(e){console.error(e);const el=document.getElementById('installmentAdminList');if(el)el.innerHTML='<div class="p-3 text-xs text-center">'+escapeHtml(e.message||'โหลดรายการไม่สำเร็จค่ะ')+'</div>';}}
-        function renderInstallmentAdminList(){const el=document.getElementById('installmentAdminList');if(!el)return;const q=(document.getElementById('installmentAdminSearch')?.value||'').trim().toLowerCase();const list=installmentData.filter(x=>!q||String(x.name||'').toLowerCase().includes(q)||String(x.orderNo||'').toLowerCase().includes(q)||String(x.product||'').toLowerCase().includes(q));const totalRemaining=installmentData.reduce((sum,x)=>sum+Math.max(0,(Number(x.total)||Number(x.totalCents||0)/100)-(Number(x.paid)||Number(x.paidCents||0)/100)),0);const active=installmentData.filter(x=>!['ชำระครบแล้ว','completed','ยกเลิก','cancelled'].includes(String(x.statusLabel||x.status||''))).length;document.getElementById('installmentAdminCount')?.replaceChildren(document.createTextNode(String(installmentData.length)));document.getElementById('installmentAdminActive')?.replaceChildren(document.createTextNode(String(active)));document.getElementById('installmentAdminRemaining')?.replaceChildren(document.createTextNode('฿'+Math.round(totalRemaining).toLocaleString()));el.innerHTML=list.length?list.map(x=>{const total=Number(x.total)||Number(x.totalCents||0)/100,paid=Number(x.paid)||Number(x.paidCents||0)/100,remaining=Math.max(0,total-paid),pct=total?Math.min(100,paid/total*100):0,status=x.statusLabel||({'active':'กำลังผ่อน','completed':'ชำระครบแล้ว','cancelled':'ยกเลิก'}[x.status]||x.status||'กำลังผ่อน');return `<div class="admin-mini-row"><div class="flex justify-between gap-2 items-center"><div class="min-w-0 flex-1"><div class="flex items-center gap-2"><b class="text-xs truncate">${escapeHtml(x.name||'-')}</b><span class="text-[9px] px-2 py-0.5 rounded-full bg-[#FFF5FB] text-[#D870B8] border border-[#F8C8DC]">${escapeHtml(status)}</span></div><div class="text-[10px] opacity-60 mt-1 truncate">${escapeHtml(x.product||'-')} · ${escapeHtml(x.orderNo||'-')}</div><div class="mt-2 h-1.5 rounded-full bg-[#F4E7ED] overflow-hidden"><div style="width:${pct}%" class="h-full bg-[#D870B8]"></div></div><div class="text-[10px] mt-1">ชำระ ฿${paid.toLocaleString()} · <b>เหลือ ฿${remaining.toLocaleString()}</b> · งวด ${escapeHtml(x.installmentNo||'-')}/${escapeHtml(x.totalInstallments||x.installmentCount||'-')}</div></div><div class="flex flex-col gap-1 text-[10px] shrink-0"><button onclick="openInstallmentAdminModal(${JSON.stringify(x.id)})" class="text-[#D870B8] font-bold">แก้ไข</button><button onclick="deleteInstallmentData(${JSON.stringify(x.id)})" class="text-rose-500 font-bold">ลบ</button></div></div></div>`}).join(''):'<div class="p-4 text-xs text-center opacity-60">ยังไม่มีรายการผ่อนค่ะ</div>';}
+        function renderInstallmentAdminList(){const el=document.getElementById('installmentAdminList');if(!el)return;const q=(document.getElementById('installmentAdminSearch')?.value||'').trim().toLowerCase();const list=installmentData.filter(x=>!q||String(x.name||'').toLowerCase().includes(q)||String(x.orderNo||'').toLowerCase().includes(q)||String(x.product||'').toLowerCase().includes(q));const totalRemaining=installmentData.reduce((sum,x)=>sum+Math.max(0,(Number(x.total)||Number(x.totalCents||0)/100)-(Number(x.paid)||Number(x.paidCents||0)/100)),0);const active=installmentData.filter(x=>!['ชำระครบแล้ว','completed','ยกเลิก','cancelled'].includes(String(x.statusLabel||x.status||''))).length;document.getElementById('installmentAdminCount')?.replaceChildren(document.createTextNode(String(installmentData.length)));document.getElementById('installmentAdminActive')?.replaceChildren(document.createTextNode(String(active)));document.getElementById('installmentAdminRemaining')?.replaceChildren(document.createTextNode('฿'+Math.round(totalRemaining).toLocaleString()));el.innerHTML=list.length?list.map(x=>{const total=Number(x.total)||Number(x.totalCents||0)/100,paid=Number(x.paid)||Number(x.paidCents||0)/100,remaining=Math.max(0,total-paid),pct=total?Math.min(100,paid/total*100):0,status=x.statusLabel||({'active':'กำลังผ่อน','completed':'ชำระครบแล้ว','cancelled':'ยกเลิก'}[x.status]||x.status||'กำลังผ่อน');return `<div class="admin-mini-row"><div class="flex justify-between gap-2 items-center"><div class="min-w-0 flex-1"><div class="flex items-center gap-2"><b class="text-xs truncate">${escapeHtml(x.name||'-')}</b><span class="text-[9px] px-2 py-0.5 rounded-full bg-[#FFF5FB] text-[#D870B8] border border-[#F8C8DC]">${escapeHtml(status)}</span></div><div class="text-[10px] opacity-60 mt-1 truncate">${escapeHtml(x.product||'-')} · ${escapeHtml(x.orderNo||'-')}</div><div class="mt-2 h-1.5 rounded-full bg-[#F4E7ED] overflow-hidden"><div style="width:${pct}%" class="h-full bg-[#D870B8]"></div></div><div class="text-[10px] mt-1">ชำระ ฿${paid.toLocaleString()} · <b>เหลือ ฿${remaining.toLocaleString()}</b> · งวด ${escapeHtml(x.installmentNo||'-')}/${escapeHtml(x.totalInstallments||x.installmentCount||'-')}</div></div><div class="flex flex-col gap-1 text-[10px] shrink-0"><button type="button" data-id="${escapeHtml(String(x.id))}" onclick="openInstallmentAdminModal(this.dataset.id)" class="text-[#D870B8] font-bold">แก้ไข</button><button type="button" data-id="${escapeHtml(String(x.id))}" onclick="deleteInstallmentData(this.dataset.id)" class="text-rose-500 font-bold">ลบ</button></div></div></div>`}).join(''):'<div class="p-4 text-xs text-center opacity-60">ยังไม่มีรายการผ่อนค่ะ</div>';}
         async function deleteInstallmentData(id){if(!confirm('ลบรายการผ่อนนี้ใช่ไหมคะ?'))return;try{await adminApi('admin-installment-delete',{installmentId:id});installmentData=installmentData.filter(x=>x.id!==id);renderInstallmentAdminList();showToast('ลบรายการผ่อนแล้วค่ะ');}catch(e){console.error(e);showToast(e.message||'ลบรายการผ่อนไม่สำเร็จค่ะ','fa-times-circle');}}
 
         function setQueueTab(tab) { queueTab = tab; currentQueuePage = 1; renderQueueList(); }
@@ -4483,6 +4491,30 @@
             desc.className = 'text-xs whitespace-pre-line mt-3 leading-relaxed';
             desc.textContent = prod.description || '';
             panel.append(title, price, desc);
+            if (prod.installmentEnabled && Array.isArray(prod.installmentPlans) && prod.installmentPlans.length && Number(prod.priceBaht) > 0) {
+                const box = document.createElement('div');
+                box.className = 'mt-4 rounded-2xl border border-[#F8C8DC] bg-[#FFF5FB] p-3';
+                const label = document.createElement('div');
+                label.className = 'text-xs font-extrabold text-[#D870B8]';
+                label.textContent = '♡ สินค้านี้ผ่อนชำระได้';
+                const select = document.createElement('select');
+                select.className = 'admin-input mt-2';
+                select.innerHTML = prod.installmentPlans.map((plan,i)=>`<option value="${i}">${Number(plan.duration)||30} วัน · ${Number(plan.installmentCount)||1} งวด</option>`).join('');
+                const result = document.createElement('div');
+                result.className = 'mt-3 text-xs';
+                const renderPlan = () => {
+                    const plan = prod.installmentPlans[Number(select.value)] || prod.installmentPlans[0];
+                    const totalCents = Math.round(Number(prod.priceBaht) * 100);
+                    const count = Math.max(1, Math.round(Number(plan.installmentCount) || 1));
+                    const each = Math.ceil(totalCents / count);
+                    const last = Math.max(0, totalCents - each * (count - 1));
+                    result.innerHTML = `<div class="grid grid-cols-2 gap-2 text-center"><div class="bg-white rounded-xl p-2"><div class="text-[9px] opacity-60">ยอดสินค้า</div><b>${money(totalCents)}</b></div><div class="bg-white rounded-xl p-2"><div class="text-[9px] opacity-60">งวดละประมาณ</div><b>${money(each)}</b></div></div><div class="mt-2 opacity-75">${count > 1 ? `งวด 1-${count-1}: ${money(each)} · งวดสุดท้าย: ${money(last)}` : 'ชำระครั้งเดียว'}</div>`;
+                };
+                select.addEventListener('change', renderPlan);
+                box.append(label, select, result);
+                renderPlan();
+                panel.appendChild(box);
+            }
             if (productStockLabel(prod)) {
                 const stock = document.createElement('p');
                 stock.className = 'text-xs font-bold mt-2 ' + (isProductSoldOut(prod) ? 'text-rose-500' : 'text-[#397CA5]');
@@ -4681,6 +4713,40 @@
             }
         }
 
+        function defaultProductInstallmentPlans() {
+            return [{duration:30, installmentCount:3}];
+        }
+        function renderProductInstallmentPlanInputs(plans = defaultProductInstallmentPlans()) {
+            const box=document.getElementById('productInstallmentPlans');
+            if(!box)return;
+            box.innerHTML='';
+            (Array.isArray(plans)&&plans.length?plans:defaultProductInstallmentPlans()).slice(0,8).forEach((plan,index)=>{
+                const row=document.createElement('div');
+                row.className='grid grid-cols-[1fr_1fr_auto] gap-2 items-end';
+                row.innerHTML=`<label class="admin-label">ระยะเวลา (วัน)<input type="number" min="1" max="3650" step="1" class="admin-input installment-plan-duration" value="${Number(plan.duration)||30}"></label><label class="admin-label">จำนวนงวด<input type="number" min="1" max="60" step="1" class="admin-input installment-plan-count" value="${Number(plan.installmentCount)||1}"></label><button type="button" class="text-rose-500 text-xs font-bold pb-3" onclick="this.closest('[data-installment-plan-row]').remove()">ลบ</button>`;
+                row.setAttribute('data-installment-plan-row','1');
+                box.appendChild(row);
+            });
+        }
+        function addProductInstallmentPlan() {
+            const box=document.getElementById('productInstallmentPlans');
+            if(!box)return;
+            if(box.children.length>=8)return showToast('เพิ่มแผนผ่อนได้สูงสุด 8 แผนค่ะ');
+            const plans=[...box.querySelectorAll('[data-installment-plan-row]')].map(row=>({duration:Number(row.querySelector('.installment-plan-duration')?.value)||30,installmentCount:Number(row.querySelector('.installment-plan-count')?.value)||1}));
+            plans.push({duration:30,installmentCount:3});
+            renderProductInstallmentPlanInputs(plans);
+        }
+        function toggleProductInstallmentFields(){
+            const enabled=!!document.getElementById('productInstallmentEnabled')?.checked;
+            document.getElementById('productInstallmentFields')?.classList.toggle('hidden',!enabled);
+            if(enabled && !document.getElementById('productInstallmentPlans')?.children.length) renderProductInstallmentPlanInputs();
+        }
+        function readProductInstallmentSettings(){
+            const enabled=!!document.getElementById('productInstallmentEnabled')?.checked;
+            const plans=[...document.querySelectorAll('#productInstallmentPlans [data-installment-plan-row]')].map(row=>({duration:Math.max(1,Math.min(3650,Math.round(Number(row.querySelector('.installment-plan-duration')?.value)||30))),installmentCount:Math.max(1,Math.min(60,Math.round(Number(row.querySelector('.installment-plan-count')?.value)||1)))}));
+            return {installmentEnabled:enabled,installmentPlans:enabled?plans.filter(x=>x.duration>0&&x.installmentCount>0):[]};
+        }
+
         function openProductModal(id = null, category = activeShopTab) {
             if (!firebaseReady || !db || !auth) {
                 const ready = initializeFirebaseSafely();
@@ -4722,6 +4788,9 @@
             preview.src = productImageData || '';
             preview.classList.toggle('hidden', !productImageData);
             renderProductImagesAdmin(prod);
+            document.getElementById('productInstallmentEnabled').checked = !!prod?.installmentEnabled;
+            renderProductInstallmentPlanInputs(Array.isArray(prod?.installmentPlans) && prod.installmentPlans.length ? prod.installmentPlans : defaultProductInstallmentPlans());
+            toggleProductInstallmentFields();
             document.getElementById('productModalHeading').textContent = prod ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า';
             document.getElementById('productModal').classList.add('active');
         }
@@ -4754,6 +4823,8 @@
             const externalLink = normalizeExternalProductUrl(link);
             if (link && !externalLink) { showToast('กรุณาใส่ลิงก์เว็บไซต์ที่ถูกต้อง เช่น https://example.com'); return; }
             const numericPrice = Number(document.getElementById('productPriceBaht').value);
+            const installmentSettings = readProductInstallmentSettings();
+            if (installmentSettings.installmentEnabled && !installmentSettings.installmentPlans.length) { showToast('กรุณาเพิ่มแผนผ่อนอย่างน้อย 1 แผนค่ะ'); return; }
             if (document.getElementById('productPriceBaht').value && (!Number.isFinite(numericPrice) || numericPrice <= 0 || numericPrice > 9999999)) { showToast('กรุณาใส่ราคาตะกร้าที่ถูกต้อง'); return; }
             if (!shopCategoryById(category)) return;
             if (!shopSubcategories(category).some(sub => sub.id === subcategory)) return;
@@ -4772,7 +4843,9 @@
                     price: document.getElementById('productPrice').value.trim(),
                     description: document.getElementById('productDescription').value.trim(),
                     link: externalLink, linkText: document.getElementById('productLinkText').value.trim(),
-                    image: pendingProductLegacyRemoval ? '' : productImageData
+                    image: pendingProductLegacyRemoval ? '' : productImageData,
+                    installmentEnabled: installmentSettings.installmentEnabled,
+                    installmentPlans: installmentSettings.installmentPlans
                 };
                 const ref = id ? db.collection('products_cakee').doc(id) : db.collection('products_cakee').doc();
                 if (payload.deliveryType === 'code' && !productCodeInventoryReady) throw new Error('กรุณารอโหลดสต็อกสินค้าก่อนบันทึกค่ะ');
