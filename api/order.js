@@ -264,6 +264,391 @@ async function submitSlip(body) {
   }
 }
 
+
+/* =========================================================
+   INSTALLMENT SYSTEM
+   - Existing full-payment flow is kept unchanged.
+   - Installment data is stored in installments_cakee.
+   - Firebase Authentication should be used by the frontend
+     for customer identity; passwords are never stored here.
+   ========================================================= */
+
+function validUid(uid) {
+  return /^[A-Za-z0-9_-]{20,200}$/.test(String(uid || ''));
+}
+
+function makeInstallmentId() {
+  return 'INS-' + crypto.randomBytes(12).toString('hex').toUpperCase();
+}
+
+function installmentSummary(data) {
+  const totalCents = Math.max(0, Math.round(Number(data.totalCents) || 0));
+  const paidCents = Math.min(totalCents, Math.max(0, Math.round(Number(data.paidCents) || 0)));
+  const remainingCents = Math.max(0, totalCents - paidCents);
+  const installmentCount = Math.max(1, Math.round(Number(data.installmentCount) || 1));
+  const paidInstallments = Math.min(
+    installmentCount,
+    Math.max(0, Math.round(Number(data.paidInstallments) || 0))
+  );
+  const progress = totalCents > 0
+    ? Math.min(100, Math.round((paidCents / totalCents) * 10000) / 100)
+    : 0;
+
+  return {
+    totalCents,
+    paidCents,
+    remainingCents,
+    installmentCount,
+    paidInstallments,
+    progress,
+    completed: remainingCents === 0
+  };
+}
+
+function normalizeInstallmentDoc(id, data) {
+  const summary = installmentSummary(data || {});
+  return {
+    id,
+    ...data,
+    ...summary
+  };
+}
+
+async function createInstallment(body) {
+  const uid = clean(body.uid, 200);
+  if (!validUid(uid)) throw new Error('รหัสสมาชิกไม่ถูกต้อง');
+
+  const name = clean(body.name, 120);
+  const contact = clean(body.contact, 120);
+  const email = clean(body.email, 200);
+  const note = clean(body.note, 1000);
+  const duration = Math.max(1, Math.min(3650, Math.round(Number(body.duration) || 30)));
+  const unit = ['days', 'weeks', 'months'].includes(String(body.unit))
+    ? String(body.unit)
+    : 'days';
+
+  const totalCents = Math.round(Number(body.totalCents));
+  const installmentCount = Math.round(Number(body.installmentCount));
+
+  if (!name) throw new Error('กรุณาระบุชื่อสมาชิก');
+  if (!Number.isInteger(totalCents) || totalCents <= 0) {
+    throw new Error('ยอดผ่อนไม่ถูกต้อง');
+  }
+  if (!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 60) {
+    throw new Error('จำนวนงวดไม่ถูกต้อง');
+  }
+
+  const installmentAmountCents = Math.ceil(totalCents / installmentCount);
+  const id = makeInstallmentId();
+  const ref = db().collection('installments_cakee').doc(id);
+
+  const now = FieldValue.serverTimestamp();
+  const data = {
+    installmentId: id,
+    uid,
+    name,
+    contact,
+    email,
+    note,
+    duration,
+    unit,
+    totalCents,
+    installmentCount,
+    installmentAmountCents,
+    currentInstallment: 1,
+    paidInstallments: 0,
+    paidCents: 0,
+    remainingCents: totalCents,
+    progress: 0,
+    status: 'active',
+    createdAt: now,
+    updatedAt: now
+  };
+
+  await ref.create(data);
+
+  return {
+    ok: true,
+    installment: normalizeInstallmentDoc(id, {
+      ...data,
+      createdAt: null,
+      updatedAt: null
+    })
+  };
+}
+
+async function getInstallmentById(id) {
+  const value = clean(id, 200);
+  if (!value) throw new Error('ไม่พบรายการผ่อนค่ะ');
+
+  const snap = await db().collection('installments_cakee').doc(value).get();
+  if (!snap.exists) return null;
+
+  return normalizeInstallmentDoc(snap.id, snap.data() || {});
+}
+
+async function listInstallmentsForUid(uid) {
+  if (!validUid(uid)) throw new Error('รหัสสมาชิกไม่ถูกต้อง');
+
+  const snap = await db()
+    .collection('installments_cakee')
+    .where('uid', '==', uid)
+    .limit(100)
+    .get();
+
+  return snap.docs
+    .map(d => normalizeInstallmentDoc(d.id, d.data() || {}))
+    .sort((a, b) => {
+      const aa = a.createdAt?.seconds || 0;
+      const bb = b.createdAt?.seconds || 0;
+      return bb - aa;
+    });
+}
+
+async function submitInstallmentSlip(body) {
+  const id = clean(body.installmentId, 200);
+  const uid = clean(body.uid, 200);
+  const image = String(body.image || '');
+
+  if (!id) throw new Error('ไม่พบรายการผ่อนค่ะ');
+  if (!validUid(uid)) throw new Error('รหัสสมาชิกไม่ถูกต้อง');
+  if (!validSlipImage(image)) {
+    throw new Error('ไฟล์สลิปต้องเป็น JPG, PNG หรือ WebP และมีขนาดไม่เกิน 700 KB');
+  }
+
+  const installmentRef = db().collection('installments_cakee').doc(id);
+  const slipRef = installmentRef.collection('slips').doc();
+
+  const snap = await installmentRef.get();
+  if (!snap.exists) throw new Error('ไม่พบรายการผ่อนค่ะ');
+
+  const installment = snap.data() || {};
+  if (String(installment.uid || '') !== uid) {
+    throw new Error('ไม่สามารถส่งสลิปของรายการนี้ได้ค่ะ');
+  }
+
+  const summary = installmentSummary(installment);
+  if (summary.completed || installment.status === 'completed') {
+    throw new Error('รายการผ่อนนี้ชำระครบแล้วค่ะ');
+  }
+
+  const currentInstallment = Math.min(
+    summary.installmentCount,
+    Math.max(1, Math.round(Number(installment.currentInstallment) || summary.paidInstallments + 1))
+  );
+
+  const remaining = summary.remainingCents;
+  const baseAmount = Math.ceil(summary.totalCents / summary.installmentCount);
+  const expectedCents = Math.min(baseAmount, remaining);
+  const expectedBaht = expectedCents / 100;
+
+  const apiKey = String(process.env.EASYSLIP_API_KEY || '').trim();
+  if (!apiKey) throw new Error('EASYSLIP_NOT_CONFIGURED');
+
+  const payload = {
+    base64: image,
+    remark: `${id}-งวด${currentInstallment}`,
+    matchAmount: expectedBaht,
+    checkDuplicate: true
+  };
+
+  const matchAccount = String(process.env.EASYSLIP_MATCH_ACCOUNT || '').toLowerCase() === 'true';
+  if (matchAccount) payload.matchAccount = true;
+
+  const response = await fetch('https://api.easyslip.com/v2/verify/bank', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok || !result.success) {
+    const code = result?.error?.code || `HTTP_${response.status}`;
+    const message = result?.error?.message || 'EasySlip ตรวจสลิปไม่สำเร็จ';
+    const error = new Error(message);
+    error.code = code;
+    throw error;
+  }
+
+  const data = result.data || {};
+  const amountInSlip = Number(data.amountInSlip ?? data.rawSlip?.amount?.amount);
+  const amountMatched = data.isAmountMatched === true ||
+    (Number.isFinite(amountInSlip) && amountInSlip === expectedBaht);
+
+  if (data.isDuplicate === true) {
+    const error = new Error('สลิปนี้เคยถูกตรวจสอบแล้วค่ะ');
+    error.code = 'DUPLICATE_SLIP';
+    throw error;
+  }
+
+  if (!amountMatched) {
+    const error = new Error(
+      `ยอดในสลิปไม่ตรงกับยอดงวดค่ะ (${Number.isFinite(amountInSlip) ? amountInSlip.toFixed(2) : '-'} บาท)`
+    );
+    error.code = 'AMOUNT_MISMATCH';
+    throw error;
+  }
+
+  if (matchAccount && data.matchedAccount == null) {
+    const error = new Error('บัญชีผู้รับในสลิปไม่ตรงกับบัญชีร้านที่ลงทะเบียนกับ EasySlip ค่ะ');
+    error.code = 'ACCOUNT_MISMATCH';
+    throw error;
+  }
+
+  const verifiedAt = FieldValue.serverTimestamp();
+
+  await db().runTransaction(async tx => {
+    const fresh = await tx.get(installmentRef);
+    if (!fresh.exists) throw new Error('ไม่พบรายการผ่อนค่ะ');
+
+    const current = fresh.data() || {};
+    const currentSummary = installmentSummary(current);
+
+    if (String(current.uid || '') !== uid) {
+      throw new Error('ไม่สามารถส่งสลิปของรายการนี้ได้ค่ะ');
+    }
+    if (currentSummary.completed || current.status === 'completed') {
+      throw new Error('รายการผ่อนนี้ชำระครบแล้วค่ะ');
+    }
+
+    const currentNo = Math.min(
+      currentSummary.installmentCount,
+      Math.max(1, Math.round(Number(current.currentInstallment) || currentSummary.paidInstallments + 1))
+    );
+
+    const currentExpected = Math.min(
+      Math.ceil(currentSummary.totalCents / currentSummary.installmentCount),
+      currentSummary.remainingCents
+    );
+
+    const slipData = {
+      installmentId: id,
+      uid,
+      installmentNo: currentNo,
+      expectedAmountCents: currentExpected,
+      image,
+      imageHost: 'base64',
+      verificationStatus: 'verified',
+      verificationMessage: result.message || 'Bank slip verified successfully',
+      easySlipData: data,
+      submittedAt: verifiedAt,
+      verifiedAt
+    };
+
+    tx.create(slipRef, slipData);
+
+    const newPaidCents = Math.min(
+      currentSummary.totalCents,
+      currentSummary.paidCents + currentExpected
+    );
+    const newPaidInstallments = Math.min(
+      currentSummary.installmentCount,
+      currentSummary.paidInstallments + 1
+    );
+    const newRemaining = Math.max(0, currentSummary.totalCents - newPaidCents);
+    const completed = newRemaining === 0;
+
+    tx.update(installmentRef, {
+      paidCents: newPaidCents,
+      remainingCents: newRemaining,
+      paidInstallments: newPaidInstallments,
+      currentInstallment: completed ? currentSummary.installmentCount : currentNo + 1,
+      progress: currentSummary.totalCents > 0
+        ? Math.min(100, Math.round((newPaidCents / currentSummary.totalCents) * 10000) / 100)
+        : 100,
+      status: completed ? 'completed' : 'active',
+      updatedAt: FieldValue.serverTimestamp(),
+      completedAt: completed ? FieldValue.serverTimestamp() : FieldValue.delete()
+    });
+  });
+
+  const updated = await getInstallmentById(id);
+
+  return {
+    ok: true,
+    verified: true,
+    completed: Boolean(updated?.completed),
+    installment: updated,
+    message: updated?.completed
+      ? 'ตรวจสลิปสำเร็จและชำระยอดผ่อนครบแล้วค่ะ'
+      : 'ตรวจสลิปสำเร็จและบันทึกยอดงวดนี้แล้วค่ะ'
+  };
+}
+
+async function adminInstallmentList() {
+  const snap = await db()
+    .collection('installments_cakee')
+    .orderBy('createdAt', 'desc')
+    .limit(300)
+    .get();
+
+  return snap.docs.map(d => normalizeInstallmentDoc(d.id, d.data() || {}));
+}
+
+async function adminInstallmentUpdate(body) {
+  const id = clean(body.installmentId || body.id, 200);
+  if (!id) throw new Error('ไม่พบรายการผ่อนค่ะ');
+
+  const ref = db().collection('installments_cakee').doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('ไม่พบรายการผ่อนค่ะ');
+
+  const current = snap.data() || {};
+  const patch = {};
+
+  if (body.name !== undefined) patch.name = clean(body.name, 120);
+  if (body.contact !== undefined) patch.contact = clean(body.contact, 120);
+  if (body.note !== undefined) patch.note = clean(body.note, 1000);
+  if (body.status !== undefined) {
+    const status = String(body.status);
+    if (!['active', 'completed', 'cancelled'].includes(status)) {
+      throw new Error('สถานะรายการผ่อนไม่ถูกต้อง');
+    }
+    patch.status = status;
+  }
+
+  if (body.paidCents !== undefined) {
+    const totalCents = Math.round(Number(current.totalCents) || 0);
+    const paidCents = Math.max(0, Math.min(totalCents, Math.round(Number(body.paidCents))));
+    patch.paidCents = paidCents;
+    patch.remainingCents = Math.max(0, totalCents - paidCents);
+    patch.progress = totalCents > 0
+      ? Math.round((paidCents / totalCents) * 10000) / 100
+      : 0;
+    if (patch.remainingCents === 0) patch.status = 'completed';
+  }
+
+  if (!Object.keys(patch).length) throw new Error('ไม่มีข้อมูลสำหรับแก้ไข');
+
+  patch.updatedAt = FieldValue.serverTimestamp();
+  await ref.update(patch);
+
+  return {
+    ok: true,
+    installment: await getInstallmentById(id)
+  };
+}
+
+async function adminInstallmentDelete(id) {
+  const value = clean(id, 200);
+  if (!value) throw new Error('ไม่พบรายการผ่อนค่ะ');
+
+  const ref = db().collection('installments_cakee').doc(value);
+  const slips = await ref.collection('slips').get();
+  const batch = db().batch();
+
+  slips.docs.forEach(doc => batch.delete(doc.ref));
+  batch.delete(ref);
+  await batch.commit();
+
+  return { ok: true };
+}
+
+
 async function adminList() {
   const snap = await db().collection('orders_cakee').orderBy('createdAt', 'desc').limit(300).get();
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -473,6 +858,57 @@ module.exports = async (req, res) => {
     }
     if (action === 'submit-slip') return send(res, 200, await submitSlip(body));
 
+    // Installment customer actions
+    if (action === 'installment-get') {
+      const installment = await getInstallmentById(clean(body.installmentId || body.id, 200));
+      if (!installment) return send(res, 404, { ok: false, error: 'ไม่พบรายการผ่อนค่ะ' });
+      if (body.uid && String(installment.uid || '') !== clean(body.uid, 200)) {
+        return send(res, 403, { ok: false, error: 'ไม่สามารถดูรายการผ่อนนี้ได้ค่ะ' });
+      }
+      return send(res, 200, { ok: true, installment });
+    }
+
+    if (action === 'installment-list') {
+      return send(res, 200, { ok: true, installments: await listInstallmentsForUid(clean(body.uid, 200)) });
+    }
+
+    if (action === 'installment-create') {
+      return send(res, 200, await createInstallment(body));
+    }
+
+    if (action === 'installment-submit-slip') {
+      try {
+        return send(res, 200, await submitInstallmentSlip(body));
+      } catch (error) {
+        console.error('installment slip verification failed', error);
+        const manualReviewCodes = new Set([
+          'EASYSLIP_NOT_CONFIGURED',
+          'INVALID_API_KEY',
+          'IP_NOT_ALLOWED',
+          'QUOTA_EXCEEDED',
+          'BRANCH_INACTIVE',
+          'SERVICE_BANNED',
+          'SERVICE_DELETED',
+          'API_SERVER_ERROR',
+          'HTTP_401',
+          'HTTP_403',
+          'HTTP_429',
+          'HTTP_500',
+          'HTTP_502',
+          'HTTP_503'
+        ]);
+        if (manualReviewCodes.has(error.code)) {
+          return send(res, 200, {
+            ok: true,
+            verified: false,
+            manualReview: true,
+            message: 'ส่งสลิปแล้วค่ะ ระบบตรวจอัตโนมัติขัดข้อง จึงส่งให้แอดมินตรวจสอบค่ะ'
+          });
+        }
+        throw error;
+      }
+    }
+
     await requireAdmin(req);
     if (action === 'admin-list') return send(res, 200, { ok: true, orders: await adminList() });
     if (action === 'admin-slip') return send(res, 200, { ok: true, slip: await adminSlip(clean(body.id, 100)) });
@@ -483,6 +919,16 @@ module.exports = async (req, res) => {
     if (action === 'admin-complete') return send(res, 200, await adminComplete(clean(body.id, 100), Boolean(body.completed)));
     if (action === 'admin-receive') return send(res, 200, await adminReceive(clean(body.id, 100)));
     if (action === 'admin-custom-delivery') return send(res, 200, await adminCustomDelivery(body));
+
+    if (action === 'admin-installment-list') {
+      return send(res, 200, { ok: true, installments: await adminInstallmentList() });
+    }
+    if (action === 'admin-installment-update') {
+      return send(res, 200, await adminInstallmentUpdate(body));
+    }
+    if (action === 'admin-installment-delete') {
+      return send(res, 200, await adminInstallmentDelete(clean(body.installmentId || body.id, 200)));
+    }
 
     return send(res, 400, { ok: false, error: 'Unknown action' });
   } catch (error) {
