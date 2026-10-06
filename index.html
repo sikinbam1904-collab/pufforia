@@ -601,6 +601,15 @@
         .product-photo-viewer-controls button { min-width: 40px; min-height: 40px; color: #D870B8; }
     </style>
 
+    <style id="slipCheckingStatusStyles">
+        .slip-checking-notice { animation: slipCheckingPulse 2.2s ease-in-out infinite; }
+        .slip-checking-notice i { animation-duration: .9s; }
+        @keyframes slipCheckingPulse {
+            0%,100% { transform: translateY(0); }
+            50% { transform: translateY(-1px); }
+        }
+        button[aria-busy="true"] { pointer-events: none; }
+    </style>
     <style id="themeVariableBridge">
         /*
          * Theme Variable Bridge
@@ -4935,6 +4944,18 @@
                 const send=document.createElement('button');send.type='button';send.className='w-full bg-[#D870B8] text-white rounded-xl py-2 font-bold';send.textContent='อัปโหลดสลิปให้แอดมินตรวจ';
                 send.onclick=()=>submitGuestSlip(token,upload,send);box.append(upload,send);
             }
+            if(order.status==='submitted') {
+                const checking=document.createElement('section');
+                checking.className='slip-checking-notice bg-[#FFF5FB] border border-[#F8C8DC] rounded-xl p-4 text-center space-y-2';
+                checking.setAttribute('role','status');
+                checking.setAttribute('aria-live','polite');
+                checking.innerHTML=`
+                    <div class="inline-flex items-center justify-center w-11 h-11 rounded-full bg-white border border-[#F8C8DC] text-[#D870B8]"><i class="fas fa-spinner fa-spin text-lg"></i></div>
+                    <p class="font-bold text-[#D870B8]">กำลังตรวจสอบสลิป</p>
+                    <p class="text-xs leading-relaxed">ร้านกำลังตรวจสอบการชำระเงินด้วย e-Slip อยู่ค่ะ<br>ไม่ต้องส่งสลิปซ้ำ และสามารถรอการอัปเดตสถานะได้เลยนะคะ ♡</p>
+                `;
+                box.append(checking);
+            }
             if(order.status==='submitted'||order.status==='paid') {
                 const receipt=document.createElement('section');receipt.className='bg-white border border-[#F8C8DC] rounded-xl p-3 space-y-2';
                 const title=document.createElement('strong');title.className='block text-[#D870B8]';title.textContent='♡ ใบยืนยันรายการสั่งซื้อ';
@@ -5013,9 +5034,43 @@
             toggle.onclick=()=>{panel.classList.toggle('hidden');toggle.setAttribute('aria-expanded',String(!panel.classList.contains('hidden')));};
             box.append(toggle,panel);
         }
+        function setSlipCheckingState(button, checking=true) {
+            if (!button) return;
+            if (checking) {
+                button.dataset.originalText = button.textContent || 'อัปโหลดสลิปให้แอดมินตรวจ';
+                button.disabled = true;
+                button.setAttribute('aria-busy','true');
+                button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>กำลังตรวจสอบสลิป…';
+                button.classList.add('opacity-80','cursor-wait');
+            } else {
+                button.disabled = false;
+                button.removeAttribute('aria-busy');
+                button.innerHTML = '<i class="fas fa-cloud-arrow-up mr-2"></i>อัปโหลดสลิปให้แอดมินตรวจ';
+                button.classList.remove('opacity-80','cursor-wait');
+            }
+        }
+
+        function showSlipCheckingNotice(box) {
+            if (!box) return;
+            box.querySelector('.slip-checking-notice')?.remove();
+            const notice = document.createElement('section');
+            notice.className = 'slip-checking-notice bg-[#FFF5FB] border border-[#F8C8DC] rounded-xl p-4 text-center space-y-2';
+            notice.setAttribute('role','status');
+            notice.setAttribute('aria-live','polite');
+            notice.innerHTML = `
+                <div class="inline-flex items-center justify-center w-11 h-11 rounded-full bg-white border border-[#F8C8DC] text-[#D870B8]">
+                    <i class="fas fa-spinner fa-spin text-lg"></i>
+                </div>
+                <p class="font-bold text-[#D870B8]">กำลังตรวจสอบสลิป</p>
+                <p class="text-xs leading-relaxed">ระบบกำลังตรวจสอบข้อมูลการโอนเงินด้วย e-Slip อยู่ค่ะ<br>กรุณารอสักครู่ และอย่าปิดหน้านี้นะคะ ♡</p>
+            `;
+            box.prepend(notice);
+        }
+
         async function submitGuestSlip(token,input,button) {
             const file=input.files?.[0];if(!file) return showToast('กรุณาเลือกภาพสลิปค่ะ');
-            button.disabled=true;
+            setSlipCheckingState(button,true);
+            showSlipCheckingNotice(document.getElementById('lookupResult'));
             try {
                 const image=await compressToBase64Image(file,{maxDimension:1600,quality:0.82,maxDataUrlBytes:500*1024});
                 const response=await fetch('/api/order',{
@@ -5025,13 +5080,14 @@
                 const result=await response.json().catch(()=>({}));
                 if(!response.ok || !result.ok) throw new Error(result.error||'ตรวจสลิปไม่สำเร็จค่ะ');
                 if(result.verified) showToast('ตรวจสลิปสำเร็จค่ะ ยืนยันการชำระเงินแล้ว');
-                else showToast(result.message||'ส่งสลิปแล้วค่ะ ระบบจะตรวจสอบให้โดยอัตโนมัติ');
+                else showToast(result.message||'ส่งสลิปแล้วค่ะ ระบบกำลังตรวจสอบให้โดยอัตโนมัติ');
                 input.value='';
                 await lookupGuestOrder();
             } catch(error) {
                 console.error('Automatic slip verification failed',error);
+                document.getElementById('lookupResult')?.querySelector('.slip-checking-notice')?.remove();
                 showToast(error.message||'ตรวจสลิปไม่สำเร็จค่ะ กรุณาลองใหม่อีกครั้ง');
-            } finally {button.disabled=false;}
+            } finally {setSlipCheckingState(button,false);}
         }
         function readSmallFile(file,maxBytes=300*1024) {
             return new Promise((resolve,reject)=>{
